@@ -48,6 +48,7 @@ form.addEventListener("submit", (event) => {
     weight: numberOrNull(formData.get("weight")),
     sleep: numberOrNull(formData.get("sleep")),
     meal: Number(formData.get("meal") || 2),
+    meals: formData.getAll("meals"),
     habits: formData.getAll("habits"),
     mood: formData.get("mood"),
     note: String(formData.get("note") || "").trim(),
@@ -141,6 +142,7 @@ onboardingForm.addEventListener("submit", (event) => {
       weight: setupWeight,
       sleep: null,
       meal: 3,
+      meals: [],
       habits: ["water"],
       mood: "calm",
       note: profile.note,
@@ -484,7 +486,10 @@ function renderSummary() {
   document.querySelector("#habit-progress").style.width = `${habitRatio}%`;
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
   document.querySelector("#streak-count").textContent = `${getStreak()}日`;
-  document.querySelector("#daily-message").textContent = getDailyMessage(score);
+  const selected = entries.find((entry) => entry.date === dateInput.value);
+  const dailyMessage = getDailyMessage(score, selected);
+  document.querySelector("#daily-message").textContent = dailyMessage;
+  document.querySelector("#coach-message").textContent = dailyMessage;
   renderGoalSummary(latestWithWeight);
 }
 
@@ -529,6 +534,7 @@ function renderAdvice() {
   const adviceList = document.querySelector("#advice-list");
   const selected = entries.find((entry) => entry.date === dateInput.value);
   const items = buildAdvice(selected);
+  renderCoachCard(selected, items);
   adviceList.innerHTML = items
     .map((item) => `<div class="advice-item"><strong>${item.title}</strong><p>${item.body}</p></div>`)
     .join("");
@@ -547,10 +553,11 @@ function renderHistory() {
       const weight = entry.weight === null ? "体重未入力" : `${entry.weight.toFixed(1)}kg`;
       const sleep = entry.sleep === null ? "睡眠未入力" : `${entry.sleep}時間睡眠`;
       const habits = entry.habits.length ? `${entry.habits.length}個の行動` : "行動チェックなし";
+      const meals = getMealLogLabel(entry.meals || []);
       return `
         <article class="history-item">
           <div class="history-date">${formatDateLabel(entry.date)}</div>
-          <div class="history-detail">${weight} / ${sleep} / ${habits}</div>
+          <div class="history-detail">${weight} / ${sleep} / ${meals} / ${habits}</div>
           <div class="score-pill">${scoreEntry(entry)}点</div>
         </article>
       `;
@@ -569,9 +576,25 @@ function fillFormForDate(date, overwrite = true) {
   document.querySelector(`input[name="meal"][value="${entry.meal}"]`).checked = true;
   document.querySelector("#mood").value = entry.mood;
   document.querySelector("#note").value = entry.note;
+  document.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
+    checkbox.checked = (entry.meals || []).includes(checkbox.value);
+  });
   document.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
     checkbox.checked = entry.habits.includes(checkbox.value);
   });
+}
+
+function renderCoachCard(entry, adviceItems) {
+  const tone = document.querySelector("#coach-tone");
+  const focus = document.querySelector("#coach-focus");
+  if (!entry) {
+    tone.textContent = "小さく整える";
+    focus.textContent = "まず今日の状態を一つ残す";
+    return;
+  }
+  const score = scoreEntry(entry);
+  tone.textContent = score >= 80 ? "いい流れ" : score >= 60 ? "土台づくり" : "回復優先";
+  focus.textContent = adviceItems[0]?.title || "今日できたことを見る";
 }
 
 function buildAdvice(entry) {
@@ -597,6 +620,9 @@ function buildAdvice(entry) {
   if (entry.meal === 1) {
     advice.push({ title: "食事を立て直す", body: "乱れた日は失敗ではなく情報です。次の食事でたんぱく質か野菜を一つ足しましょう。" });
   }
+  if ((entry.meals || []).length < 2) {
+    advice.push({ title: "食事ログを軽く残す", body: "朝昼夜を全部詳しく書かなくて大丈夫。まずは食べたタイミングだけ残すと流れが見えます。" });
+  }
   if (entry.sleep !== null && entry.sleep < 6) {
     advice.push({ title: "睡眠を優先", body: "睡眠不足の日は食欲が強くなりやすいので、明日は早めに休む作戦がよさそうです。" });
   }
@@ -619,9 +645,10 @@ function buildAdvice(entry) {
 }
 
 function scoreEntry(entry) {
-  let score = 24;
+  let score = 18;
   score += entry.meal * 10;
-  score += Math.min(entry.habits.length, 6) * 6;
+  score += Math.min((entry.meals || []).length, 4) * 3;
+  score += Math.min(entry.habits.length, 6) * 5;
   if (entry.sleep !== null) {
     score += entry.sleep >= 7 ? 20 : entry.sleep >= 6 ? 12 : 5;
   }
@@ -662,12 +689,20 @@ function getWeightTrend(latest, previous) {
   return `前回から${sign}${diff.toFixed(1)}kg`;
 }
 
-function getDailyMessage(score) {
+function getDailyMessage(score, entry) {
+  if (entry && (entry.meals || []).length === 0) return "食事の流れを一つ残す";
+  if (entry && entry.habits.length === 0) return "小さな健康行動を選ぶ";
   if (score === null) return "焦らず整える";
   if (score >= 85) return "かなりいい流れ";
   if (score >= 70) return "土台が整っている";
   if (score >= 55) return "できたことを見る";
   return "回復を優先";
+}
+
+function getMealLogLabel(meals) {
+  if (!meals.length) return "食事ログなし";
+  const labels = { breakfast: "朝", lunch: "昼", dinner: "夜", snack: "間食" };
+  return meals.map((meal) => labels[meal]).filter(Boolean).join("・");
 }
 
 function getScoreDetail(score) {

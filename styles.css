@@ -147,6 +147,40 @@ h2 {
   line-height: 1.8;
 }
 
+.coach-strip {
+  width: min(520px, 100%);
+  margin-top: 18px;
+  display: grid;
+  gap: 4px;
+  border-left: 4px solid var(--green);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 13px 14px;
+}
+
+.coach-strip span,
+.coach-card span {
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.coach-strip strong {
+  font-size: 1.08rem;
+}
+
+.quick-log-button {
+  width: fit-content;
+  margin-top: 14px;
+  border-radius: 8px;
+  padding: 11px 15px;
+  background: var(--green);
+  color: #fff;
+  font-weight: 850;
+  text-decoration: none;
+}
+
 .today-card,
 .metric,
 .panel {
@@ -304,14 +338,16 @@ legend {
 }
 
 .segmented,
-.checks {
+.checks,
+.meal-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .segmented label,
-.checks label {
+.checks label,
+.meal-grid label {
   display: inline-flex;
   align-items: center;
   color: var(--ink);
@@ -319,14 +355,16 @@ legend {
 }
 
 .segmented input,
-.checks input {
+.checks input,
+.meal-grid input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
 .segmented span,
-.checks span {
+.checks span,
+.meal-grid span {
   min-height: 42px;
   display: inline-flex;
   align-items: center;
@@ -336,6 +374,23 @@ legend {
   background: #fffdfa;
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.meal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.meal-grid span {
+  width: 100%;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.meal-grid strong {
+  font-size: 1.08rem;
 }
 
 .checks span::before {
@@ -351,14 +406,16 @@ legend {
 }
 
 .segmented input:checked + span,
-.checks input:checked + span {
+.checks input:checked + span,
+.meal-grid input:checked + span {
   border-color: var(--green);
   background: var(--green-soft);
   color: #1d5a3c;
 }
 
 .segmented span:hover,
-.checks span:hover {
+.checks span:hover,
+.meal-grid span:hover {
   transform: translateY(-1px);
 }
 
@@ -387,6 +444,19 @@ legend {
 .advice-list {
   display: grid;
   gap: 10px;
+}
+
+.coach-card {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--green-soft), #fffdfa);
+  padding: 14px;
+}
+
+.coach-card strong {
+  font-size: 1.18rem;
 }
 
 .advice-item {
@@ -596,6 +666,10 @@ legend {
     padding: 22px;
   }
 
+  .meal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .today-card {
     grid-template-columns: 1fr auto;
     align-items: center;
@@ -642,7 +716,8 @@ legend {
   }
 
   .checks span,
-  .segmented span {
+  .segmented span,
+  .meal-grid span {
     min-height: 40px;
     padding: 8px 10px;
   }

@@ -57,6 +57,11 @@
           <p class="eyebrow">Healthy weight journey</p>
           <h1 id="app-title">My Diet Notebook</h1>
           <p class="lead">体重だけに振り回されず、食事・睡眠・行動を整えていくための記録帳。</p>
+          <div class="coach-strip">
+            <span>今日の整え方</span>
+            <strong id="coach-message">まず一つ、できる行動を選ぶ</strong>
+          </div>
+          <a class="quick-log-button" href="#entry-form">今日を記録</a>
         </div>
         <div class="today-card" aria-label="今日の状態">
           <span id="today-label"></span>
@@ -115,11 +120,21 @@
           </div>
 
           <fieldset class="control-group">
-            <legend>今日の食事バランス</legend>
+            <legend>食事の整い方</legend>
             <div class="segmented">
               <label><input type="radio" name="meal" value="1"><span>乱れた</span></label>
               <label><input type="radio" name="meal" value="2"><span>ふつう</span></label>
               <label><input type="radio" name="meal" value="3" checked><span>整った</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="control-group">
+            <legend>食事ログ</legend>
+            <div class="meal-grid">
+              <label><input type="checkbox" name="meals" value="breakfast"><span><strong>朝</strong>記録した</span></label>
+              <label><input type="checkbox" name="meals" value="lunch"><span><strong>昼</strong>記録した</span></label>
+              <label><input type="checkbox" name="meals" value="dinner"><span><strong>夜</strong>記録した</span></label>
+              <label><input type="checkbox" name="meals" value="snack"><span><strong>間食</strong>整えた</span></label>
             </div>
           </fieldset>
 
@@ -158,10 +173,14 @@
           <section class="panel insights">
             <div class="panel-heading">
               <div>
-                <p class="section-kicker">Reflection</p>
-                <h2>ふりかえり</h2>
+                <p class="section-kicker">Coach</p>
+                <h2>今日のコーチ</h2>
               </div>
               <button id="clear-today" class="ghost-button" type="button">今日を消す</button>
+            </div>
+            <div class="coach-card">
+              <span id="coach-tone">小さく整える</span>
+              <strong id="coach-focus">記録から始めましょう</strong>
             </div>
             <div id="advice-list" class="advice-list"></div>
             <div class="progress-block">
