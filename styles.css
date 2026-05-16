@@ -635,6 +635,81 @@ legend {
   margin-top: 18px;
 }
 
+.chart-panel {
+  margin-top: 18px;
+}
+
+.chart-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.chart-legend i,
+.chart-legend b {
+  width: 22px;
+  height: 4px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.chart-legend i {
+  background: var(--green);
+}
+
+.chart-legend b {
+  background: var(--coral);
+}
+
+.chart-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.weight-chart {
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+  display: block;
+}
+
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart-label {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-line,
+.chart-average {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-line {
+  stroke: var(--green);
+  stroke-width: 4;
+}
+
+.chart-average {
+  stroke: var(--coral);
+  stroke-width: 3;
+  stroke-dasharray: 8 8;
+}
+
+.chart-dot {
+  fill: #fffdfa;
+  stroke: var(--green);
+  stroke-width: 3;
+}
+
 .history-list {
   display: grid;
   gap: 10px;

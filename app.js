@@ -522,6 +522,7 @@ function bytesFromBase64(text) {
 function render() {
   renderSummary();
   renderAdvice();
+  renderWeightChart();
   renderHistory();
   fillFormForDate(dateInput.value, false);
 }
@@ -625,6 +626,65 @@ function renderHistory() {
       `;
     })
     .join("");
+}
+
+function renderWeightChart() {
+  const svg = document.querySelector("#weight-chart");
+  const empty = document.querySelector("#chart-empty");
+  const points = entries
+    .filter((entry) => entry.weight !== null)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-30);
+
+  svg.innerHTML = '<title id="weight-chart-title">体重の推移グラフ</title>';
+  if (points.length < 2) {
+    svg.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+
+  svg.hidden = false;
+  empty.hidden = true;
+
+  const width = 720;
+  const height = 280;
+  const pad = { top: 22, right: 26, bottom: 42, left: 52 };
+  const weights = points.map((point) => point.weight);
+  const min = Math.floor(Math.min(...weights) - 0.5);
+  const max = Math.ceil(Math.max(...weights) + 0.5);
+  const range = Math.max(1, max - min);
+  const xStep = (width - pad.left - pad.right) / Math.max(1, points.length - 1);
+  const x = (index) => pad.left + index * xStep;
+  const y = (weight) => pad.top + ((max - weight) / range) * (height - pad.top - pad.bottom);
+  const actualPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(point.weight).toFixed(1)}`).join(" ");
+  const averagePoints = points.map((point, index) => ({
+    date: point.date,
+    weight: averageWeight(points.slice(Math.max(0, index - 6), index + 1)),
+  }));
+  const averagePath = averagePoints.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(point.weight).toFixed(1)}`).join(" ");
+  const grid = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const value = max - range * ratio;
+    const yy = pad.top + ratio * (height - pad.top - pad.bottom);
+    return `<g><line class="chart-grid" x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}"></line><text class="chart-label" x="10" y="${yy + 4}">${value.toFixed(1)}</text></g>`;
+  }).join("");
+  const labels = [0, Math.floor((points.length - 1) / 2), points.length - 1]
+    .filter((value, index, array) => array.indexOf(value) === index)
+    .map((index) => `<text class="chart-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${formatShortDate(points[index].date)}</text>`)
+    .join("");
+  const dots = points.map((point, index) => `<circle class="chart-dot" cx="${x(index)}" cy="${y(point.weight)}" r="4"><title>${formatDateLabel(point.date)} ${point.weight.toFixed(1)}kg</title></circle>`).join("");
+
+  svg.insertAdjacentHTML("beforeend", `
+    ${grid}
+    <path class="chart-average" d="${averagePath}"></path>
+    <path class="chart-line" d="${actualPath}"></path>
+    ${dots}
+    ${labels}
+  `);
+}
+
+function averageWeight(items) {
+  return items.reduce((sum, item) => sum + item.weight, 0) / items.length;
 }
 
 function fillFormForDate(date, overwrite = true) {
@@ -814,6 +874,13 @@ function formatDateLabel(date) {
     month: "numeric",
     day: "numeric",
     weekday: "short",
+  }).format(new Date(`${date}T00:00:00`));
+}
+
+function formatShortDate(date) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
   }).format(new Date(`${date}T00:00:00`));
 }
 
