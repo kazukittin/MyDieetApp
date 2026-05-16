@@ -194,9 +194,10 @@
                 <input id="cloud-password" name="cloudPassword" type="password" placeholder="スマホとPCで同じもの">
               </label>
               <div class="cloud-actions">
-                <button class="primary-button" type="submit">クラウド設定を保存</button>
+                <button id="save-cloud-config" class="primary-button" type="submit">クラウド設定を保存</button>
                 <button id="sync-now" class="ghost-button" type="button">今すぐ同期</button>
               </div>
+              <p id="cloud-feedback" class="cloud-feedback" role="status" aria-live="polite">クラウド設定を入れるとスマホとPCで同期できます。</p>
             </form>
           </details>
         </aside>

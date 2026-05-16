@@ -9,6 +9,8 @@ const exportButton = document.querySelector("#export-data");
 const syncStatus = document.querySelector("#sync-status");
 const cloudForm = document.querySelector("#cloud-form");
 const syncNowButton = document.querySelector("#sync-now");
+const saveCloudConfigButton = document.querySelector("#save-cloud-config");
+const cloudFeedback = document.querySelector("#cloud-feedback");
 const onboarding = document.querySelector("#onboarding");
 const onboardingForm = document.querySelector("#onboarding-form");
 const skipOnboardingButton = document.querySelector("#skip-onboarding");
@@ -86,6 +88,7 @@ exportButton.addEventListener("click", () => {
 
 cloudForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  setCloudFeedback("loading", "クラウド設定を保存しています...");
   const formData = new FormData(cloudForm);
   cloudConfig = {
     url: String(formData.get("cloudUrl") || "").trim().replace(/\/$/, ""),
@@ -94,12 +97,23 @@ cloudForm.addEventListener("submit", (event) => {
     password: String(formData.get("cloudPassword") || ""),
   };
   localStorage.setItem(cloudStorageKey, JSON.stringify(cloudConfig));
-  syncFromCloud({ pushWhenEmpty: true });
+  withCloudBusy(saveCloudConfigButton, "保存中...", async () => {
+    await syncFromCloud({ pushWhenEmpty: true });
+    setCloudFeedback("success", "クラウド設定を保存して同期しました。");
+  });
 });
 
 syncNowButton.addEventListener("click", (event) => {
   event.preventDefault();
-  syncFromCloud({ pushWhenEmpty: true });
+  if (!hasCloudConfig()) {
+    setCloudFeedback("error", "Supabase URL、キー、同期ID、同期パスワードを入れてください。");
+    return;
+  }
+  setCloudFeedback("loading", "クラウドと同期しています...");
+  withCloudBusy(syncNowButton, "同期中...", async () => {
+    await syncFromCloud({ pushWhenEmpty: true });
+    setCloudFeedback("success", "最新データに同期しました。");
+  });
 });
 
 onboardingForm.addEventListener("submit", (event) => {
@@ -162,8 +176,8 @@ function saveEntries() {
     pushEntriesToServer();
   }
   if (hasCloudConfig()) {
-    pushEntriesToCloud().catch(() => {
-      setSyncState("同期エラー", "端末内に保存中");
+    pushEntriesToCloud().catch((error) => {
+      setSyncState("同期エラー", getCloudErrorMessage(error));
     });
   }
 }
@@ -282,7 +296,10 @@ async function syncFromCloud(options = {}) {
     setSyncState("クラウド同期");
     render();
   } catch (error) {
-    setSyncState("同期エラー", getCloudErrorMessage(error));
+    const message = getCloudErrorMessage(error);
+    setSyncState("同期エラー", message);
+    setCloudFeedback("error", message);
+    throw error;
   }
 }
 
@@ -354,6 +371,25 @@ function getCloudErrorMessage(error) {
 function setSyncState(status, message) {
   syncStatus.textContent = status;
   if (message) document.querySelector("#daily-message").textContent = message;
+}
+
+async function withCloudBusy(button, busyText, action) {
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = busyText;
+  try {
+    await action();
+  } catch {
+    // Detailed feedback is set where the cloud error is classified.
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+function setCloudFeedback(type, message) {
+  cloudFeedback.textContent = message;
+  cloudFeedback.className = `cloud-feedback is-${type}`;
 }
 
 async function encryptCloudData(value) {

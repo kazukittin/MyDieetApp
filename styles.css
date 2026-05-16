@@ -487,6 +487,37 @@ legend {
   align-items: center;
 }
 
+.cloud-feedback {
+  margin: 0;
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.cloud-feedback.is-success {
+  background: var(--green-soft);
+  color: #1d5a3c;
+}
+
+.cloud-feedback.is-error {
+  background: var(--coral-soft);
+  color: #914935;
+}
+
+.cloud-feedback.is-loading {
+  background: #f1eadc;
+  color: var(--amber);
+}
+
+.primary-button:disabled,
+.ghost-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .history-panel {
   margin-top: 18px;
 }
