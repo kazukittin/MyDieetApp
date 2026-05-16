@@ -32,9 +32,9 @@
           <label>
             <span>目標ペース</span>
             <select id="setup-pace" name="setupPace">
-              <option value="gentle">ゆるやか</option>
-              <option value="steady" selected>標準</option>
-              <option value="active">しっかり</option>
+              <option value="gentle">ゆるやか 週0.25kg</option>
+              <option value="steady" selected>標準 週0.5kg</option>
+              <option value="active">しっかり 週0.75kg</option>
             </select>
           </label>
         </div>
@@ -72,19 +72,24 @@
           <small id="weight-trend">記録を始めましょう</small>
         </article>
         <article class="metric">
-          <span>今週の健康スコア</span>
-          <strong id="weekly-score">--</strong>
-          <small>食事・運動・睡眠・気分</small>
+          <span>7日平均</span>
+          <strong id="weekly-average">-- kg</strong>
+          <small id="weekly-average-detail">日々の上下をならして見る</small>
         </article>
         <article class="metric">
-          <span>今日の一言</span>
-          <strong id="daily-message">焦らず整える</strong>
-          <small>無理なく続くペースで</small>
+          <span>行動スコア</span>
+          <strong id="weekly-score">--</strong>
+          <small id="weekly-score-detail">食事・運動・睡眠・気分</small>
         </article>
-        <article class="metric goal-metric">
+        <article class="metric">
           <span>目標まで</span>
           <strong id="goal-remaining">-- kg</strong>
           <small id="goal-detail">初回設定で表示されます</small>
+        </article>
+        <article class="metric goal-metric">
+          <span>今日の一言</span>
+          <strong id="daily-message">焦らず整える</strong>
+          <small id="pace-detail">無理なく続くペースで</small>
         </article>
       </section>
 
@@ -110,7 +115,7 @@
           </div>
 
           <fieldset class="control-group">
-            <legend>食事の整い方</legend>
+            <legend>今日の食事バランス</legend>
             <div class="segmented">
               <label><input type="radio" name="meal" value="1"><span>乱れた</span></label>
               <label><input type="radio" name="meal" value="2"><span>ふつう</span></label>
@@ -119,13 +124,14 @@
           </fieldset>
 
           <fieldset class="control-group">
-            <legend>今日できたこと</legend>
+            <legend>健康行動チェック</legend>
             <div class="checks">
               <label><input type="checkbox" name="habits" value="water"><span>水分</span></label>
               <label><input type="checkbox" name="habits" value="protein"><span>たんぱく質</span></label>
               <label><input type="checkbox" name="habits" value="vegetables"><span>野菜・海藻</span></label>
               <label><input type="checkbox" name="habits" value="walk"><span>歩く・運動</span></label>
               <label><input type="checkbox" name="habits" value="no_snack"><span>間食控えめ</span></label>
+              <label><input type="checkbox" name="habits" value="slow_eating"><span>ゆっくり食べる</span></label>
             </div>
           </fieldset>
 

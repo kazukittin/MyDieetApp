@@ -187,13 +187,13 @@ h2 {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
 
 .metric {
-  min-height: 132px;
+  min-height: 138px;
   padding: 18px;
   display: grid;
   align-content: space-between;
@@ -201,7 +201,7 @@ h2 {
 }
 
 .metric strong {
-  font-size: clamp(1.45rem, 3vw, 1.85rem);
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem);
   line-height: 1.1;
 }
 
@@ -336,6 +336,18 @@ legend {
   background: #fffdfa;
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.checks span::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.checks input:checked + span::before {
+  background: var(--green);
 }
 
 .segmented input:checked + span,
@@ -571,9 +583,12 @@ legend {
 
   .hero,
   .workspace,
-  .summary-grid,
   .field-row {
     grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .hero-copy {
@@ -617,6 +632,10 @@ legend {
 }
 
 @media (max-width: 460px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .panel,
   .hero-copy {
     padding: 16px;

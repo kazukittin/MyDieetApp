@@ -141,7 +141,7 @@ onboardingForm.addEventListener("submit", (event) => {
       weight: setupWeight,
       sleep: null,
       meal: 3,
-      habits: [],
+      habits: ["water"],
       mood: "calm",
       note: profile.note,
       updatedAt: new Date().toISOString(),
@@ -477,6 +477,8 @@ function renderSummary() {
   const weekEntries = getRecentEntries(7);
   const score = weekEntries.length ? Math.round(weekEntries.reduce((sum, entry) => sum + scoreEntry(entry), 0) / weekEntries.length) : null;
   document.querySelector("#weekly-score").textContent = score === null ? "--" : `${score}点`;
+  document.querySelector("#weekly-score-detail").textContent = getScoreDetail(score);
+  renderWeeklyAverage(weekEntries);
 
   const habitRatio = getHabitRatio(weekEntries);
   document.querySelector("#habit-progress").style.width = `${habitRatio}%`;
@@ -486,24 +488,37 @@ function renderSummary() {
   renderGoalSummary(latestWithWeight);
 }
 
+function renderWeeklyAverage(weekEntries) {
+  const weights = weekEntries.filter((entry) => entry.weight !== null).map((entry) => entry.weight);
+  const average = weights.length ? weights.reduce((sum, weight) => sum + weight, 0) / weights.length : null;
+  document.querySelector("#weekly-average").textContent = average === null ? "-- kg" : `${average.toFixed(1)} kg`;
+  document.querySelector("#weekly-average-detail").textContent = weights.length
+    ? `${weights.length}件の記録から計算`
+    : "体重を記録すると表示";
+}
+
 function renderGoalSummary(latestWithWeight) {
   const remaining = document.querySelector("#goal-remaining");
   const detail = document.querySelector("#goal-detail");
+  const paceDetail = document.querySelector("#pace-detail");
   if (!profile.goalWeight || !latestWithWeight) {
     remaining.textContent = "-- kg";
     detail.textContent = "初回設定で表示されます";
+    paceDetail.textContent = "無理なく続くペースで";
     return;
   }
 
   const diff = latestWithWeight.weight - profile.goalWeight;
   const absolute = Math.abs(diff).toFixed(1);
   remaining.textContent = diff > 0 ? `${absolute} kg` : "達成中";
+  paceDetail.textContent = getPaceLabel(profile.pace);
 
   if (profile.startWeight) {
     const total = Math.abs(profile.startWeight - profile.goalWeight);
     const done = Math.min(total, Math.max(0, Math.abs(profile.startWeight - latestWithWeight.weight)));
     const percent = total ? Math.round((done / total) * 100) : 100;
-    detail.textContent = `開始から${percent}%進行`;
+    const targetDate = getEstimatedTargetDate(profile.startWeight, profile.goalWeight, profile.pace, profile.startDate);
+    detail.textContent = targetDate ? `開始から${percent}% / 目安 ${targetDate}` : `開始から${percent}%進行`;
     return;
   }
 
@@ -561,13 +576,27 @@ function fillFormForDate(date, overwrite = true) {
 
 function buildAdvice(entry) {
   if (!entry) {
-    return [
-      { title: "今日の記録から始める", body: "体重だけでなく、睡眠や食事の整い方も残すと体調の流れが見えます。" },
-      { title: "小さく勝つ", body: "水分、たんぱく質、歩くことのどれか一つで十分です。続く量が正解です。" },
+    const starter = [
+      { title: "今日の記録から始める", body: "体重は週平均で見ます。今日は食事・睡眠・行動のどれか一つを残せば十分です。" },
+      { title: "小さく勝つ", body: "水分、たんぱく質、野菜、歩くことのどれか一つで十分です。続く量が正解です。" },
     ];
+    if (profile.goalWeight) {
+      starter.unshift({ title: "目標ペース", body: `${getPaceLabel(profile.pace)}で見ています。急ぐより、続く体調を優先しましょう。` });
+    }
+    return starter.slice(0, 3);
   }
 
   const advice = [];
+  const latestWithWeight = entries.find((item) => item.weight !== null);
+  if (profile.goalWeight && latestWithWeight) {
+    const diff = latestWithWeight.weight - profile.goalWeight;
+    if (diff > 0) {
+      advice.push({ title: "目標は週単位で見る", body: `${getPaceLabel(profile.pace)}。今日の増減より、7日平均と健康行動を見ていきましょう。` });
+    }
+  }
+  if (entry.meal === 1) {
+    advice.push({ title: "食事を立て直す", body: "乱れた日は失敗ではなく情報です。次の食事でたんぱく質か野菜を一つ足しましょう。" });
+  }
   if (entry.sleep !== null && entry.sleep < 6) {
     advice.push({ title: "睡眠を優先", body: "睡眠不足の日は食欲が強くなりやすいので、明日は早めに休む作戦がよさそうです。" });
   }
@@ -576,6 +605,9 @@ function buildAdvice(entry) {
   }
   if (!entry.habits.includes("walk")) {
     advice.push({ title: "軽く動く", body: "長い運動でなくて大丈夫。10分歩くだけでも、明日の自分に効いてきます。" });
+  }
+  if (!entry.habits.includes("slow_eating")) {
+    advice.push({ title: "食べ方をゆっくりに", body: "量を減らす前に、よく噛んでゆっくり食べるだけでも満足感を作りやすくなります。" });
   }
   if (entry.mood === "stress" || entry.mood === "hungry") {
     advice.push({ title: "責めない日", body: "ストレスや空腹が強い日は、制限よりも整える日。温かい飲み物や早めの夕食が味方です。" });
@@ -587,11 +619,11 @@ function buildAdvice(entry) {
 }
 
 function scoreEntry(entry) {
-  let score = 30;
-  score += entry.meal * 12;
-  score += Math.min(entry.habits.length, 5) * 7;
+  let score = 24;
+  score += entry.meal * 10;
+  score += Math.min(entry.habits.length, 6) * 6;
   if (entry.sleep !== null) {
-    score += entry.sleep >= 7 ? 18 : entry.sleep >= 6 ? 10 : 4;
+    score += entry.sleep >= 7 ? 20 : entry.sleep >= 6 ? 12 : 5;
   }
   if (entry.mood === "good" || entry.mood === "calm") score += 10;
   return Math.min(100, score);
@@ -600,7 +632,7 @@ function scoreEntry(entry) {
 function getHabitRatio(weekEntries) {
   if (!weekEntries.length) return 0;
   const done = weekEntries.reduce((sum, entry) => sum + entry.habits.length, 0);
-  return Math.round((done / (weekEntries.length * 5)) * 100);
+  return Math.round((done / (weekEntries.length * 6)) * 100);
 }
 
 function getRecentEntries(days) {
@@ -636,6 +668,37 @@ function getDailyMessage(score) {
   if (score >= 70) return "土台が整っている";
   if (score >= 55) return "できたことを見る";
   return "回復を優先";
+}
+
+function getScoreDetail(score) {
+  if (score === null) return "食事・運動・睡眠・気分";
+  if (score >= 85) return "今週はかなり安定";
+  if (score >= 70) return "健康行動が積み上がり中";
+  if (score >= 55) return "小さな行動を増やしたい";
+  return "まず睡眠と食事を整える";
+}
+
+function getPaceLabel(pace) {
+  const labels = {
+    gentle: "ゆるやか 週0.25kg目安",
+    steady: "標準 週0.5kg目安",
+    active: "しっかり 週0.75kg目安",
+  };
+  return labels[pace] || "標準 週0.5kg目安";
+}
+
+function getPaceKgPerWeek(pace) {
+  const paces = { gentle: 0.25, steady: 0.5, active: 0.75 };
+  return paces[pace] || 0.5;
+}
+
+function getEstimatedTargetDate(startWeight, goalWeight, pace, startDate) {
+  const total = Math.abs(startWeight - goalWeight);
+  if (!total) return null;
+  const weeks = Math.ceil(total / getPaceKgPerWeek(pace));
+  const date = new Date(`${startDate || isoToday}T00:00:00`);
+  date.setDate(date.getDate() + weeks * 7);
+  return new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric" }).format(date);
 }
 
 function numberOrNull(value) {
