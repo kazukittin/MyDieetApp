@@ -91,7 +91,7 @@ cloudForm.addEventListener("submit", (event) => {
   setCloudFeedback("loading", "クラウド設定を保存しています...");
   const formData = new FormData(cloudForm);
   cloudConfig = {
-    url: String(formData.get("cloudUrl") || "").trim().replace(/\/$/, ""),
+    url: normalizeSupabaseUrl(formData.get("cloudUrl")),
     key: String(formData.get("cloudKey") || "").trim(),
     id: String(formData.get("cloudId") || "").trim(),
     password: String(formData.get("cloudPassword") || ""),
@@ -363,7 +363,7 @@ function getCloudErrorMessage(error) {
     return "SupabaseのキーかRLS設定を確認";
   }
   if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
-    return "URLか通信設定を確認";
+    return "Supabase URLを確認";
   }
   return "Supabase設定を確認";
 }
@@ -390,6 +390,18 @@ async function withCloudBusy(button, busyText, action) {
 function setCloudFeedback(type, message) {
   cloudFeedback.textContent = message;
   cloudFeedback.className = `cloud-feedback is-${type}`;
+}
+
+function normalizeSupabaseUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  try {
+    const url = new URL(text.startsWith("http") ? text : `https://${text}`);
+    return url.origin.replace(/\/$/, "");
+  } catch {
+    return text.replace(/\/rest\/v1\/?$/i, "").replace(/\/rest\/?$/i, "").replace(/\/$/, "");
+  }
 }
 
 async function encryptCloudData(value) {
