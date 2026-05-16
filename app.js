@@ -14,6 +14,11 @@ const cloudFeedback = document.querySelector("#cloud-feedback");
 const onboarding = document.querySelector("#onboarding");
 const onboardingForm = document.querySelector("#onboarding-form");
 const skipOnboardingButton = document.querySelector("#skip-onboarding");
+const settingsScreen = document.querySelector("#settings-screen");
+const openSettingsButton = document.querySelector("#open-settings");
+const closeSettingsButton = document.querySelector("#close-settings");
+const profileForm = document.querySelector("#profile-form");
+const profileFeedback = document.querySelector("#profile-feedback");
 const canUseServerSync = isPrivateHost(location.hostname);
 const cloudStorageKey = "my-diet-notebook:cloud:v1";
 const profileStorageKey = "my-diet-notebook:profile:v1";
@@ -27,6 +32,7 @@ dateInput.value = isoToday;
 document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 syncStatus.textContent = canUseServerSync ? "共有保存" : "端末保存";
 fillCloudForm();
+fillProfileForm();
 showOnboardingIfNeeded();
 syncFromServer();
 syncFromCloud();
@@ -117,6 +123,18 @@ syncNowButton.addEventListener("click", (event) => {
   });
 });
 
+openSettingsButton.addEventListener("click", openSettings);
+document.querySelectorAll(".open-settings-secondary").forEach((button) => {
+  button.addEventListener("click", openSettings);
+});
+closeSettingsButton.addEventListener("click", closeSettings);
+settingsScreen.addEventListener("click", (event) => {
+  if (event.target === settingsScreen) closeSettings();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !settingsScreen.hidden) closeSettings();
+});
+
 onboardingForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(onboardingForm);
@@ -162,6 +180,30 @@ skipOnboardingButton.addEventListener("click", () => {
   localStorage.setItem(profileStorageKey, JSON.stringify(profile));
   onboarding.hidden = true;
   render();
+});
+
+profileForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(profileForm);
+  profile = {
+    ...profile,
+    startDate: profile.startDate || isoToday,
+    startWeight: numberOrNull(formData.get("profileStartWeight")),
+    goalWeight: numberOrNull(formData.get("profileGoalWeight")),
+    height: numberOrNull(formData.get("profileHeight")),
+    pace: String(formData.get("profilePace") || "steady"),
+    note: String(formData.get("profileNote") || "").trim(),
+    skipped: false,
+    updatedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  setProfileFeedback("success", "初期設定を保存しました。");
+  render();
+  if (hasCloudConfig()) {
+    pushEntriesToCloud().catch((error) => {
+      setProfileFeedback("error", getCloudErrorMessage(error));
+    });
+  }
 });
 
 function loadEntries() {
@@ -212,6 +254,24 @@ function fillCloudForm() {
   document.querySelector("#cloud-id").value = cloudConfig.id || "";
   document.querySelector("#cloud-password").value = cloudConfig.password || "";
   if (hasCloudConfig()) setSyncState("クラウド同期");
+}
+
+function fillProfileForm() {
+  document.querySelector("#profile-start-weight").value = profile.startWeight ?? "";
+  document.querySelector("#profile-goal-weight").value = profile.goalWeight ?? "";
+  document.querySelector("#profile-height").value = profile.height ?? "";
+  document.querySelector("#profile-pace").value = profile.pace || "steady";
+  document.querySelector("#profile-note").value = profile.note || "";
+}
+
+function openSettings() {
+  fillCloudForm();
+  fillProfileForm();
+  settingsScreen.hidden = false;
+}
+
+function closeSettings() {
+  settingsScreen.hidden = true;
 }
 
 function hasCloudConfig() {
@@ -392,6 +452,11 @@ async function withCloudBusy(button, busyText, action) {
 function setCloudFeedback(type, message) {
   cloudFeedback.textContent = message;
   cloudFeedback.className = `cloud-feedback is-${type}`;
+}
+
+function setProfileFeedback(type, message) {
+  profileFeedback.textContent = message;
+  profileFeedback.className = `cloud-feedback is-${type}`;
 }
 
 function normalizeSupabaseUrl(value) {

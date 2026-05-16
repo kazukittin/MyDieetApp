@@ -51,6 +51,85 @@
       </form>
     </div>
 
+    <div id="settings-screen" class="settings-screen" hidden>
+      <section class="settings-panel" aria-labelledby="settings-title">
+        <div class="settings-header">
+          <div>
+            <p class="section-kicker">Settings</p>
+            <h2 id="settings-title">設定</h2>
+          </div>
+          <button id="close-settings" class="ghost-button" type="button">閉じる</button>
+        </div>
+
+        <div class="settings-grid">
+          <section class="settings-section">
+            <h3>初期設定</h3>
+            <p>目標体重やペースをあとから調整できます。</p>
+            <form id="profile-form" class="settings-form" autocomplete="off">
+              <div class="field-row">
+                <label class="field-card">
+                  <span>開始体重 kg</span>
+                  <input type="number" id="profile-start-weight" name="profileStartWeight" min="20" max="250" step="0.1" placeholder="62.4">
+                </label>
+                <label class="field-card">
+                  <span>目標体重 kg</span>
+                  <input type="number" id="profile-goal-weight" name="profileGoalWeight" min="20" max="250" step="0.1" placeholder="58.0">
+                </label>
+              </div>
+              <div class="field-row">
+                <label class="field-card">
+                  <span>身長 cm</span>
+                  <input type="number" id="profile-height" name="profileHeight" min="100" max="230" step="0.1" placeholder="165">
+                </label>
+                <label>
+                  <span>目標ペース</span>
+                  <select id="profile-pace" name="profilePace">
+                    <option value="gentle">ゆるやか 週0.25kg</option>
+                    <option value="steady">標準 週0.5kg</option>
+                    <option value="active">しっかり 週0.75kg</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                <span>意識したいこと</span>
+                <textarea id="profile-note" name="profileNote" rows="3" placeholder="例: 夜更かしを減らす、昼に歩く、間食を整える"></textarea>
+              </label>
+              <button class="primary-button" type="submit">初期設定を保存</button>
+              <p id="profile-feedback" class="cloud-feedback" role="status" aria-live="polite">保存すると目標カードに反映されます。</p>
+            </form>
+          </section>
+
+          <section class="settings-section">
+            <h3>クラウド同期</h3>
+            <p>同じ同期IDと同期パスワードを入れると、スマホとPCで同じデータを見られます。</p>
+            <form id="cloud-form" class="cloud-form" autocomplete="off">
+              <label>
+                <span>Supabase URL</span>
+                <input id="cloud-url" name="cloudUrl" type="url" placeholder="https://xxxx.supabase.co">
+              </label>
+              <label>
+                <span>Anon key</span>
+                <input id="cloud-key" name="cloudKey" type="password" placeholder="sb_publishable_...">
+              </label>
+              <label>
+                <span>同期ID</span>
+                <input id="cloud-id" name="cloudId" type="text" placeholder="my-diet-note">
+              </label>
+              <label>
+                <span>同期パスワード</span>
+                <input id="cloud-password" name="cloudPassword" type="password" placeholder="スマホとPCで同じもの">
+              </label>
+              <div class="cloud-actions">
+                <button id="save-cloud-config" class="primary-button" type="submit">クラウド設定を保存</button>
+                <button id="sync-now" class="ghost-button" type="button">今すぐ同期</button>
+              </div>
+              <p id="cloud-feedback" class="cloud-feedback" role="status" aria-live="polite">クラウド設定を入れるとスマホとPCで同期できます。</p>
+            </form>
+          </section>
+        </div>
+      </section>
+    </div>
+
     <main class="app-shell">
       <section class="hero" aria-labelledby="app-title">
         <div class="hero-copy">
@@ -61,7 +140,10 @@
             <span>今日の整え方</span>
             <strong id="coach-message">まず一つ、できる行動を選ぶ</strong>
           </div>
-          <a class="quick-log-button" href="#entry-form">今日を記録</a>
+          <div class="hero-actions">
+            <a class="quick-log-button" href="#entry-form">今日を記録</a>
+            <button id="open-settings" class="settings-button" type="button">設定</button>
+          </div>
         </div>
         <div class="today-card" aria-label="今日の状態">
           <span id="today-label"></span>
@@ -194,37 +276,12 @@
             </div>
           </section>
 
-          <details class="panel cloud-panel">
-            <summary>
-              <span>
-                <small>Cloud sync</small>
-                クラウド同期
-              </span>
-            </summary>
-            <form id="cloud-form" class="cloud-form" autocomplete="off">
-              <label>
-                <span>Supabase URL</span>
-                <input id="cloud-url" name="cloudUrl" type="url" placeholder="https://xxxx.supabase.co">
-              </label>
-              <label>
-                <span>Anon key</span>
-                <input id="cloud-key" name="cloudKey" type="password" placeholder="sb_publishable_...">
-              </label>
-              <label>
-                <span>同期ID</span>
-                <input id="cloud-id" name="cloudId" type="text" placeholder="my-diet-note">
-              </label>
-              <label>
-                <span>同期パスワード</span>
-                <input id="cloud-password" name="cloudPassword" type="password" placeholder="スマホとPCで同じもの">
-              </label>
-              <div class="cloud-actions">
-                <button id="save-cloud-config" class="primary-button" type="submit">クラウド設定を保存</button>
-                <button id="sync-now" class="ghost-button" type="button">今すぐ同期</button>
-              </div>
-              <p id="cloud-feedback" class="cloud-feedback" role="status" aria-live="polite">クラウド設定を入れるとスマホとPCで同期できます。</p>
-            </form>
-          </details>
+          <section class="panel settings-shortcut">
+            <p class="section-kicker">Settings</p>
+            <h2>設定と同期</h2>
+            <p>初期設定やクラウド同期はここから開けます。</p>
+            <button class="primary-button open-settings-secondary" type="button">設定を開く</button>
+          </section>
         </aside>
       </section>
 

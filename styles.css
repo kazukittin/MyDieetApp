@@ -57,6 +57,66 @@ button {
   backdrop-filter: blur(10px);
 }
 
+.settings-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(31, 41, 51, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.settings-screen[hidden] {
+  display: none;
+}
+
+.settings-panel {
+  width: min(1060px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 28px 80px rgba(20, 28, 38, 0.28);
+  padding: 22px;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.settings-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  padding: 18px;
+}
+
+.settings-section h3 {
+  margin: 0 0 8px;
+}
+
+.settings-section p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.settings-form {
+  margin-top: 14px;
+}
+
 .onboarding[hidden] {
   display: none;
 }
@@ -170,15 +230,32 @@ h2 {
   font-size: 1.08rem;
 }
 
-.quick-log-button {
-  width: fit-content;
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 14px;
+}
+
+.quick-log-button,
+.settings-button {
+  width: fit-content;
   border-radius: 8px;
   padding: 11px 15px;
+  font-weight: 850;
+}
+
+.quick-log-button {
   background: var(--green);
   color: #fff;
-  font-weight: 850;
   text-decoration: none;
+}
+
+.settings-button {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ink);
+  cursor: pointer;
 }
 
 .today-card,
@@ -512,53 +589,7 @@ legend {
   transition: width 180ms ease;
 }
 
-.cloud-panel {
-  padding: 0;
-}
-
-.cloud-panel summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.cloud-panel summary::-webkit-details-marker {
-  display: none;
-}
-
-.cloud-panel summary span {
-  display: grid;
-  gap: 3px;
-  font-weight: 850;
-}
-
-.cloud-panel summary small {
-  color: var(--green);
-  font-size: 0.72rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.cloud-panel summary::after {
-  content: "開く";
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: var(--blue-soft);
-  color: var(--blue);
-  font-size: 0.82rem;
-  font-weight: 850;
-}
-
-.cloud-panel[open] summary::after {
-  content: "閉じる";
-}
-
 .cloud-form {
-  padding: 0 20px 20px;
   grid-template-columns: 1fr;
 }
 
@@ -592,6 +623,11 @@ legend {
 .cloud-feedback.is-loading {
   background: #f1eadc;
   color: var(--amber);
+}
+
+.settings-shortcut p {
+  color: var(--muted);
+  line-height: 1.65;
 }
 
 .primary-button:disabled,
@@ -703,6 +739,19 @@ legend {
   .onboarding-actions {
     grid-template-columns: 1fr;
   }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settings-header .ghost-button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 460px) {
@@ -722,11 +771,8 @@ legend {
     padding: 8px 10px;
   }
 
-  .cloud-panel summary {
+  .settings-panel,
+  .settings-section {
     padding: 16px;
-  }
-
-  .cloud-form {
-    padding: 0 16px 16px;
   }
 }
