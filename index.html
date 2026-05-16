@@ -8,12 +8,13 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="topbar" aria-labelledby="app-title">
-        <div>
+      <section class="hero" aria-labelledby="app-title">
+        <div class="hero-copy">
           <p class="eyebrow">Healthy weight journey</p>
           <h1 id="app-title">My Diet Notebook</h1>
+          <p class="lead">体重だけに振り回されず、食事・睡眠・行動を整えていくための記録帳。</p>
         </div>
-        <div class="today-card">
+        <div class="today-card" aria-label="今日の状態">
           <span id="today-label"></span>
           <strong id="streak-count">0日</strong>
           <small id="sync-status">端末保存</small>
@@ -39,24 +40,27 @@
       </section>
 
       <section class="workspace">
-        <form id="entry-form" class="panel" autocomplete="off">
+        <form id="entry-form" class="panel entry-panel" autocomplete="off">
           <div class="panel-heading">
-            <h2>今日の記録</h2>
+            <div>
+              <p class="section-kicker">Daily log</p>
+              <h2>今日の記録</h2>
+            </div>
             <input type="date" id="entry-date" name="date" required>
           </div>
 
           <div class="field-row">
-            <label>
+            <label class="field-card">
               <span>体重 kg</span>
-              <input type="number" id="weight" name="weight" min="20" max="250" step="0.1" placeholder="例: 62.4">
+              <input type="number" id="weight" name="weight" min="20" max="250" step="0.1" placeholder="62.4">
             </label>
-            <label>
+            <label class="field-card">
               <span>睡眠 時間</span>
-              <input type="number" id="sleep" name="sleep" min="0" max="24" step="0.5" placeholder="例: 7">
+              <input type="number" id="sleep" name="sleep" min="0" max="24" step="0.5" placeholder="7">
             </label>
           </div>
 
-          <fieldset>
+          <fieldset class="control-group">
             <legend>食事の整い方</legend>
             <div class="segmented">
               <label><input type="radio" name="meal" value="1"><span>乱れた</span></label>
@@ -65,14 +69,14 @@
             </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset class="control-group">
             <legend>今日できたこと</legend>
             <div class="checks">
-              <label><input type="checkbox" name="habits" value="water">水分を意識</label>
-              <label><input type="checkbox" name="habits" value="protein">たんぱく質</label>
-              <label><input type="checkbox" name="habits" value="vegetables">野菜・海藻</label>
-              <label><input type="checkbox" name="habits" value="walk">歩く・運動</label>
-              <label><input type="checkbox" name="habits" value="no_snack">間食控えめ</label>
+              <label><input type="checkbox" name="habits" value="water"><span>水分</span></label>
+              <label><input type="checkbox" name="habits" value="protein"><span>たんぱく質</span></label>
+              <label><input type="checkbox" name="habits" value="vegetables"><span>野菜・海藻</span></label>
+              <label><input type="checkbox" name="habits" value="walk"><span>歩く・運動</span></label>
+              <label><input type="checkbox" name="habits" value="no_snack"><span>間食控えめ</span></label>
             </div>
           </fieldset>
 
@@ -95,54 +99,67 @@
           <button class="primary-button" type="submit">記録する</button>
         </form>
 
-        <aside class="panel insights">
-          <div class="panel-heading">
-            <h2>ふりかえり</h2>
-            <button id="clear-today" class="ghost-button" type="button">今日を消す</button>
-          </div>
-          <div id="advice-list" class="advice-list"></div>
-          <div class="progress-block">
-            <div class="progress-label">
-              <span>今週の行動達成</span>
-              <strong id="habit-progress-label">0%</strong>
+        <aside class="side-stack">
+          <section class="panel insights">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Reflection</p>
+                <h2>ふりかえり</h2>
+              </div>
+              <button id="clear-today" class="ghost-button" type="button">今日を消す</button>
             </div>
-            <div class="progress-track">
-              <div id="habit-progress" class="progress-fill"></div>
+            <div id="advice-list" class="advice-list"></div>
+            <div class="progress-block">
+              <div class="progress-label">
+                <span>今週の行動達成</span>
+                <strong id="habit-progress-label">0%</strong>
+              </div>
+              <div class="progress-track">
+                <div id="habit-progress" class="progress-fill"></div>
+              </div>
             </div>
-          </div>
-        </aside>
-      </section>
+          </section>
 
-      <section class="panel cloud-panel">
-        <div class="panel-heading">
-          <h2>クラウド同期</h2>
-          <button id="sync-now" class="ghost-button" type="button">同期する</button>
-        </div>
-        <form id="cloud-form" class="cloud-form" autocomplete="off">
-          <label>
-            <span>Supabase URL</span>
-            <input id="cloud-url" name="cloudUrl" type="url" placeholder="https://xxxx.supabase.co">
-          </label>
-          <label>
-            <span>Anon key</span>
-            <input id="cloud-key" name="cloudKey" type="password" placeholder="Supabaseのanon public key">
-          </label>
-          <label>
-            <span>同期ID</span>
-            <input id="cloud-id" name="cloudId" type="text" placeholder="例: my-diet-note">
-          </label>
-          <label>
-            <span>同期パスワード</span>
-            <input id="cloud-password" name="cloudPassword" type="password" placeholder="スマホとPCで同じもの">
-          </label>
-          <button class="primary-button" type="submit">クラウド設定を保存</button>
-        </form>
+          <details class="panel cloud-panel">
+            <summary>
+              <span>
+                <small>Cloud sync</small>
+                クラウド同期
+              </span>
+            </summary>
+            <form id="cloud-form" class="cloud-form" autocomplete="off">
+              <label>
+                <span>Supabase URL</span>
+                <input id="cloud-url" name="cloudUrl" type="url" placeholder="https://xxxx.supabase.co">
+              </label>
+              <label>
+                <span>Anon key</span>
+                <input id="cloud-key" name="cloudKey" type="password" placeholder="sb_publishable_...">
+              </label>
+              <label>
+                <span>同期ID</span>
+                <input id="cloud-id" name="cloudId" type="text" placeholder="my-diet-note">
+              </label>
+              <label>
+                <span>同期パスワード</span>
+                <input id="cloud-password" name="cloudPassword" type="password" placeholder="スマホとPCで同じもの">
+              </label>
+              <div class="cloud-actions">
+                <button class="primary-button" type="submit">クラウド設定を保存</button>
+                <button id="sync-now" class="ghost-button" type="button">今すぐ同期</button>
+              </div>
+            </form>
+          </details>
+        </aside>
       </section>
 
       <section class="panel history-panel">
         <div class="panel-heading">
-          <h2>記録履歴</h2>
-          <button id="export-data" class="ghost-button" type="button">データを書き出す</button>
+          <div>
+            <p class="section-kicker">History</p>
+            <h2>記録履歴</h2>
+          </div>
+          <button id="export-data" class="ghost-button" type="button">書き出す</button>
         </div>
         <div class="history-list" id="history-list"></div>
       </section>

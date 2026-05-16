@@ -91,7 +91,8 @@ cloudForm.addEventListener("submit", (event) => {
   syncFromCloud({ pushWhenEmpty: true });
 });
 
-syncNowButton.addEventListener("click", () => {
+syncNowButton.addEventListener("click", (event) => {
+  event.preventDefault();
   syncFromCloud({ pushWhenEmpty: true });
 });
 
