@@ -625,11 +625,6 @@ legend {
   color: var(--amber);
 }
 
-.settings-shortcut p {
-  color: var(--muted);
-  line-height: 1.65;
-}
-
 .primary-button:disabled,
 .ghost-button:disabled {
   cursor: wait;

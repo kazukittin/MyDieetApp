@@ -124,9 +124,6 @@ syncNowButton.addEventListener("click", (event) => {
 });
 
 openSettingsButton.addEventListener("click", openSettings);
-document.querySelectorAll(".open-settings-secondary").forEach((button) => {
-  button.addEventListener("click", openSettings);
-});
 closeSettingsButton.addEventListener("click", closeSettings);
 settingsScreen.addEventListener("click", (event) => {
   if (event.target === settingsScreen) closeSettings();
