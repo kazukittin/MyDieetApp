@@ -58,6 +58,7 @@ form.addEventListener("submit", (event) => {
   const formData = new FormData(form);
   const date = formData.get("date");
   const scope = event.submitter?.dataset.saveScope || "all";
+  setSaveFeedback(scope, "saving", "保存しています...");
   const previous = entries.find((item) => item.date === date);
   const entry = {
     date,
@@ -99,6 +100,7 @@ form.addEventListener("submit", (event) => {
   entries.sort((a, b) => b.date.localeCompare(a.date));
   saveEntries();
   render();
+  setSaveFeedback(scope, "success", getSaveSuccessMessage(scope));
 });
 
 dateInput.addEventListener("change", () => {
@@ -255,6 +257,7 @@ function saveEntries() {
   if (hasCloudConfig()) {
     pushEntriesToCloud().catch((error) => {
       setSyncState("同期エラー", getCloudErrorMessage(error));
+      setSaveFeedback("all", "error", `端末には保存しました。${getCloudErrorMessage(error)}`);
     });
   }
 }
@@ -500,6 +503,28 @@ function setCloudFeedback(type, message) {
 function setProfileFeedback(type, message) {
   profileFeedback.textContent = message;
   profileFeedback.className = `cloud-feedback is-${type}`;
+}
+
+function setSaveFeedback(scope, type, message) {
+  const targets = scope === "all"
+    ? ["weight", "exercise", "food"]
+    : [scope];
+  targets.forEach((target) => {
+    const element = document.querySelector(`#${target}-save-feedback`);
+    if (!element) return;
+    element.textContent = message;
+    element.className = `save-feedback is-${type}`;
+  });
+}
+
+function getSaveSuccessMessage(scope) {
+  const labels = {
+    weight: "体重を保存しました。",
+    exercise: "運動記録を保存しました。",
+    food: "食事記録を保存しました。",
+    all: "記録を保存しました。",
+  };
+  return labels[scope] || labels.all;
 }
 
 function normalizeSupabaseUrl(value) {
