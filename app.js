@@ -16,7 +16,6 @@ const onboardingForm = document.querySelector("#onboarding-form");
 const skipOnboardingButton = document.querySelector("#skip-onboarding");
 const settingsScreen = document.querySelector("#settings-screen");
 const openSettingsButton = document.querySelector("#open-settings");
-const openSettingsNavButton = document.querySelector("#open-settings-nav");
 const closeSettingsButton = document.querySelector("#close-settings");
 const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
@@ -34,8 +33,12 @@ let cloudConfig = loadCloudConfig();
 let profile = loadProfile();
 
 dateInput.value = isoToday;
-document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
-syncStatus.textContent = canUseServerSync ? "共有保存" : "端末保存";
+if (document.querySelector("#today-label")) {
+  document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
+}
+if (syncStatus) {
+  syncStatus.textContent = canUseServerSync ? "共有保存" : "端末保存";
+}
 fillCloudForm();
 fillProfileForm();
 showOnboardingIfNeeded();
@@ -154,7 +157,6 @@ syncNowButton.addEventListener("click", (event) => {
 });
 
 openSettingsButton.addEventListener("click", openSettings);
-openSettingsNavButton.addEventListener("click", openSettings);
 pageButtons.forEach((button) => {
   button.addEventListener("click", () => switchPage(button.dataset.pageTarget));
 });
@@ -472,7 +474,7 @@ function getCloudErrorMessage(error) {
 }
 
 function setSyncState(status, message) {
-  syncStatus.textContent = status;
+  if (syncStatus) syncStatus.textContent = status;
   if (message) document.querySelector("#daily-message").textContent = message;
 }
 
@@ -592,11 +594,9 @@ function renderSummary() {
   const habitRatio = getHabitRatio(weekEntries);
   document.querySelector("#habit-progress").style.width = `${habitRatio}%`;
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
-  document.querySelector("#streak-count").textContent = `${getStreak()}日`;
   const selected = entries.find((entry) => entry.date === dateInput.value);
   const dailyMessage = getDailyMessage(score, selected);
   document.querySelector("#daily-message").textContent = dailyMessage;
-  document.querySelector("#coach-message").textContent = dailyMessage;
   renderGoalSummary(latestWithWeight);
 }
 
