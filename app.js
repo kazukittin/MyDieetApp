@@ -9,17 +9,23 @@ const exportButton = document.querySelector("#export-data");
 const syncStatus = document.querySelector("#sync-status");
 const cloudForm = document.querySelector("#cloud-form");
 const syncNowButton = document.querySelector("#sync-now");
+const onboarding = document.querySelector("#onboarding");
+const onboardingForm = document.querySelector("#onboarding-form");
+const skipOnboardingButton = document.querySelector("#skip-onboarding");
 const canUseServerSync = isPrivateHost(location.hostname);
 const cloudStorageKey = "my-diet-notebook:cloud:v1";
+const profileStorageKey = "my-diet-notebook:profile:v1";
 const cloudTable = "diet_app_sync";
 
 let entries = loadEntries();
 let cloudConfig = loadCloudConfig();
+let profile = loadProfile();
 
 dateInput.value = isoToday;
 document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 syncStatus.textContent = canUseServerSync ? "共有保存" : "端末保存";
 fillCloudForm();
+showOnboardingIfNeeded();
 syncFromServer();
 syncFromCloud();
 
@@ -96,6 +102,52 @@ syncNowButton.addEventListener("click", (event) => {
   syncFromCloud({ pushWhenEmpty: true });
 });
 
+onboardingForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(onboardingForm);
+  const setupWeight = numberOrNull(formData.get("setupWeight"));
+  const setupGoalWeight = numberOrNull(formData.get("setupGoalWeight"));
+  const setupHeight = numberOrNull(formData.get("setupHeight"));
+
+  profile = {
+    startDate: isoToday,
+    startWeight: setupWeight,
+    goalWeight: setupGoalWeight,
+    height: setupHeight,
+    pace: String(formData.get("setupPace") || "steady"),
+    note: String(formData.get("setupNote") || "").trim(),
+    skipped: false,
+    updatedAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  if (setupWeight !== null && !entries.some((entry) => entry.date === isoToday)) {
+    entries.push({
+      date: isoToday,
+      weight: setupWeight,
+      sleep: null,
+      meal: 3,
+      habits: [],
+      mood: "calm",
+      note: profile.note,
+      updatedAt: new Date().toISOString(),
+    });
+    entries.sort((a, b) => b.date.localeCompare(a.date));
+    saveEntries();
+  }
+
+  onboarding.hidden = true;
+  fillFormForDate(isoToday);
+  render();
+});
+
+skipOnboardingButton.addEventListener("click", () => {
+  profile = { skipped: true, updatedAt: new Date().toISOString() };
+  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  onboarding.hidden = true;
+  render();
+});
+
 function loadEntries() {
   try {
     return JSON.parse(localStorage.getItem(storageKey)) || [];
@@ -111,8 +163,7 @@ function saveEntries() {
   }
   if (hasCloudConfig()) {
     pushEntriesToCloud().catch(() => {
-      syncStatus.textContent = "同期エラー";
-      document.querySelector("#daily-message").textContent = "端末内に保存中";
+      setSyncState("同期エラー", "端末内に保存中");
     });
   }
 }
@@ -125,12 +176,26 @@ function loadCloudConfig() {
   }
 }
 
+function loadProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(profileStorageKey)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function showOnboardingIfNeeded() {
+  if (!profile.startWeight && !profile.skipped && !entries.length) {
+    onboarding.hidden = false;
+  }
+}
+
 function fillCloudForm() {
   document.querySelector("#cloud-url").value = cloudConfig.url || "";
   document.querySelector("#cloud-key").value = cloudConfig.key || "";
   document.querySelector("#cloud-id").value = cloudConfig.id || "";
   document.querySelector("#cloud-password").value = cloudConfig.password || "";
-  if (hasCloudConfig()) syncStatus.textContent = "クラウド同期";
+  if (hasCloudConfig()) setSyncState("クラウド同期");
 }
 
 function hasCloudConfig() {
@@ -152,11 +217,10 @@ async function syncFromServer() {
       entries.sort((a, b) => b.date.localeCompare(a.date));
       localStorage.setItem(storageKey, JSON.stringify(entries));
       if (entries.length !== serverEntries.length) saveEntries();
-      syncStatus.textContent = "共有保存";
+      setSyncState("共有保存");
     }
   } catch {
-    syncStatus.textContent = "端末保存";
-    document.querySelector("#daily-message").textContent = "端末内に保存中";
+    setSyncState("端末保存", "端末内に保存中");
   }
 
   render();
@@ -176,10 +240,9 @@ async function pushEntriesToServer() {
     });
 
     if (!saveResponse.ok) throw new Error("Save failed");
-    syncStatus.textContent = "共有保存";
+    setSyncState("共有保存");
   } catch {
-    syncStatus.textContent = "端末保存";
-    document.querySelector("#daily-message").textContent = "端末内に保存中";
+    setSyncState("端末保存", "端末内に保存中");
   }
 }
 
@@ -198,30 +261,35 @@ async function syncFromCloud(options = {}) {
   if (!hasCloudConfig()) return;
 
   try {
+    setSyncState("同期中");
     const cloudEntry = await fetchCloudEntry();
     if (!cloudEntry) {
       if (options.pushWhenEmpty || entries.length) await pushEntriesToCloud();
-      syncStatus.textContent = "クラウド同期";
+      setSyncState("クラウド同期");
       return;
     }
 
-    const cloudEntries = await decryptEntries(cloudEntry.encrypted_payload);
+    const cloudData = await decryptCloudData(cloudEntry.encrypted_payload);
+    const cloudEntries = Array.isArray(cloudData) ? cloudData : cloudData.entries;
     entries = mergeEntries(entries, Array.isArray(cloudEntries) ? cloudEntries : []);
+    if (!profile.startWeight && cloudData.profile) {
+      profile = cloudData.profile;
+      localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+    }
     entries.sort((a, b) => b.date.localeCompare(a.date));
     localStorage.setItem(storageKey, JSON.stringify(entries));
     await pushEntriesToCloud();
-    syncStatus.textContent = "クラウド同期";
+    setSyncState("クラウド同期");
     render();
-  } catch {
-    syncStatus.textContent = "同期エラー";
-    document.querySelector("#daily-message").textContent = "端末内に保存中";
+  } catch (error) {
+    setSyncState("同期エラー", getCloudErrorMessage(error));
   }
 }
 
 async function pushEntriesToCloud() {
   if (!hasCloudConfig()) return;
 
-  const encryptedPayload = await encryptEntries(entries);
+  const encryptedPayload = await encryptCloudData({ entries, profile });
   const response = await fetch(`${cloudConfig.url}/rest/v1/${cloudTable}?on_conflict=id`, {
     method: "POST",
     headers: cloudHeaders({ prefer: "resolution=merge-duplicates" }),
@@ -232,8 +300,8 @@ async function pushEntriesToCloud() {
     }),
   });
 
-  if (!response.ok) throw new Error("Cloud save failed");
-  syncStatus.textContent = "クラウド同期";
+  if (!response.ok) throw new Error(await getSupabaseError(response, "Cloud save failed"));
+  setSyncState("クラウド同期");
 }
 
 async function fetchCloudEntry() {
@@ -241,21 +309,54 @@ async function fetchCloudEntry() {
     `${cloudConfig.url}/rest/v1/${cloudTable}?id=eq.${encodeURIComponent(cloudConfig.id)}&select=id,encrypted_payload,updated_at`,
     { headers: cloudHeaders() },
   );
-  if (!response.ok) throw new Error("Cloud load failed");
+  if (!response.ok) throw new Error(await getSupabaseError(response, "Cloud load failed"));
   const rows = await response.json();
   return Array.isArray(rows) ? rows[0] : null;
 }
 
 function cloudHeaders(extra = {}) {
-  return {
+  const headers = {
     apikey: cloudConfig.key,
-    Authorization: `Bearer ${cloudConfig.key}`,
     "Content-Type": "application/json",
     Prefer: extra.prefer || "return=minimal",
   };
+  if (!cloudConfig.key.startsWith("sb_publishable_")) {
+    headers.Authorization = `Bearer ${cloudConfig.key}`;
+  }
+  return headers;
 }
 
-async function encryptEntries(value) {
+async function getSupabaseError(response, fallback) {
+  let detail = "";
+  try {
+    const payload = await response.json();
+    detail = payload.message || payload.error || payload.hint || "";
+  } catch {
+    detail = await response.text().catch(() => "");
+  }
+  return `${fallback}: ${response.status}${detail ? ` ${detail}` : ""}`;
+}
+
+function getCloudErrorMessage(error) {
+  const message = String(error?.message || "");
+  if (message.includes("404") || message.includes("Could not find the table")) {
+    return "Supabaseのテーブルが見つかりません";
+  }
+  if (message.includes("401") || message.includes("403") || message.includes("permission denied") || message.includes("row-level security")) {
+    return "SupabaseのキーかRLS設定を確認";
+  }
+  if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
+    return "URLか通信設定を確認";
+  }
+  return "Supabase設定を確認";
+}
+
+function setSyncState(status, message) {
+  syncStatus.textContent = status;
+  if (message) document.querySelector("#daily-message").textContent = message;
+}
+
+async function encryptCloudData(value) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveCloudKey();
   const encoded = new TextEncoder().encode(JSON.stringify(value));
@@ -263,7 +364,7 @@ async function encryptEntries(value) {
   return `${base64FromBytes(iv)}.${base64FromBytes(new Uint8Array(encrypted))}`;
 }
 
-async function decryptEntries(payload) {
+async function decryptCloudData(payload) {
   const [ivText, encryptedText] = String(payload || "").split(".");
   if (!ivText || !encryptedText) return [];
   const key = await deriveCloudKey();
@@ -334,6 +435,31 @@ function renderSummary() {
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
   document.querySelector("#streak-count").textContent = `${getStreak()}日`;
   document.querySelector("#daily-message").textContent = getDailyMessage(score);
+  renderGoalSummary(latestWithWeight);
+}
+
+function renderGoalSummary(latestWithWeight) {
+  const remaining = document.querySelector("#goal-remaining");
+  const detail = document.querySelector("#goal-detail");
+  if (!profile.goalWeight || !latestWithWeight) {
+    remaining.textContent = "-- kg";
+    detail.textContent = "初回設定で表示されます";
+    return;
+  }
+
+  const diff = latestWithWeight.weight - profile.goalWeight;
+  const absolute = Math.abs(diff).toFixed(1);
+  remaining.textContent = diff > 0 ? `${absolute} kg` : "達成中";
+
+  if (profile.startWeight) {
+    const total = Math.abs(profile.startWeight - profile.goalWeight);
+    const done = Math.min(total, Math.max(0, Math.abs(profile.startWeight - latestWithWeight.weight)));
+    const percent = total ? Math.round((done / total) * 100) : 100;
+    detail.textContent = `開始から${percent}%進行`;
+    return;
+  }
+
+  detail.textContent = `目標 ${profile.goalWeight.toFixed(1)}kg`;
 }
 
 function renderAdvice() {
