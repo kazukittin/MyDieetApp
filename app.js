@@ -16,13 +16,18 @@ const onboardingForm = document.querySelector("#onboarding-form");
 const skipOnboardingButton = document.querySelector("#skip-onboarding");
 const settingsScreen = document.querySelector("#settings-screen");
 const openSettingsButton = document.querySelector("#open-settings");
+const openSettingsNavButton = document.querySelector("#open-settings-nav");
 const closeSettingsButton = document.querySelector("#close-settings");
 const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
+const pageButtons = document.querySelectorAll("[data-page-target]");
+const appPages = document.querySelectorAll(".app-page");
 const canUseServerSync = isPrivateHost(location.hostname);
 const cloudStorageKey = "my-diet-notebook:cloud:v1";
 const profileStorageKey = "my-diet-notebook:profile:v1";
 const cloudTable = "diet_app_sync";
+const foodHabitValues = ["water", "protein", "vegetables", "no_snack", "slow_eating"];
+const exerciseHabitValues = ["walk", "stretch", "strength"];
 
 let entries = loadEntries();
 let cloudConfig = loadCloudConfig();
@@ -49,17 +54,42 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(form);
   const date = formData.get("date");
+  const scope = event.submitter?.dataset.saveScope || "all";
+  const previous = entries.find((item) => item.date === date);
   const entry = {
     date,
-    weight: numberOrNull(formData.get("weight")),
-    sleep: numberOrNull(formData.get("sleep")),
-    meal: Number(formData.get("meal") || 2),
-    meals: formData.getAll("meals"),
-    habits: formData.getAll("habits"),
-    mood: formData.get("mood"),
-    note: String(formData.get("note") || "").trim(),
+    weight: previous?.weight ?? null,
+    sleep: previous?.sleep ?? null,
+    meal: previous?.meal ?? 2,
+    meals: previous?.meals ?? [],
+    habits: previous?.habits ?? [],
+    mood: previous?.mood ?? "calm",
+    note: previous?.note ?? "",
     updatedAt: new Date().toISOString(),
   };
+
+  if (scope === "weight" || scope === "all") {
+    entry.weight = numberOrNull(formData.get("weight"));
+    entry.sleep = numberOrNull(formData.get("sleep"));
+  }
+
+  if (scope === "food" || scope === "all") {
+    const selectedHabits = formData.getAll("habits");
+    const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
+    const selectedFood = selectedHabits.filter((habit) => foodHabitValues.includes(habit));
+    entry.meal = Number(formData.get("meal") || 2);
+    entry.meals = formData.getAll("meals");
+    entry.habits = [...new Set([...preservedExercise, ...selectedFood])];
+    entry.mood = formData.get("mood");
+    entry.note = String(formData.get("note") || "").trim();
+  }
+
+  if (scope === "exercise" || scope === "all") {
+    const selectedHabits = formData.getAll("habits");
+    const preservedFood = entry.habits.filter((habit) => foodHabitValues.includes(habit));
+    const selectedExercise = selectedHabits.filter((habit) => exerciseHabitValues.includes(habit));
+    entry.habits = [...new Set([...preservedFood, ...selectedExercise])];
+  }
 
   entries = entries.filter((item) => item.date !== date);
   entries.push(entry);
@@ -124,6 +154,10 @@ syncNowButton.addEventListener("click", (event) => {
 });
 
 openSettingsButton.addEventListener("click", openSettings);
+openSettingsNavButton.addEventListener("click", openSettings);
+pageButtons.forEach((button) => {
+  button.addEventListener("click", () => switchPage(button.dataset.pageTarget));
+});
 closeSettingsButton.addEventListener("click", closeSettings);
 settingsScreen.addEventListener("click", (event) => {
   if (event.target === settingsScreen) closeSettings();
@@ -269,6 +303,16 @@ function openSettings() {
 
 function closeSettings() {
   settingsScreen.hidden = true;
+}
+
+function switchPage(pageName) {
+  appPages.forEach((page) => {
+    page.classList.toggle("is-active", page.dataset.page === pageName);
+  });
+  document.querySelectorAll(".tab-button[data-page-target]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.pageTarget === pageName);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function hasCloudConfig() {
@@ -770,7 +814,7 @@ function scoreEntry(entry) {
   let score = 18;
   score += entry.meal * 10;
   score += Math.min((entry.meals || []).length, 4) * 3;
-  score += Math.min(entry.habits.length, 6) * 5;
+  score += Math.min(entry.habits.length, 8) * 4;
   if (entry.sleep !== null) {
     score += entry.sleep >= 7 ? 20 : entry.sleep >= 6 ? 12 : 5;
   }
@@ -781,7 +825,7 @@ function scoreEntry(entry) {
 function getHabitRatio(weekEntries) {
   if (!weekEntries.length) return 0;
   const done = weekEntries.reduce((sum, entry) => sum + entry.habits.length, 0);
-  return Math.round((done / (weekEntries.length * 6)) * 100);
+  return Math.round((done / (weekEntries.length * 8)) * 100);
 }
 
 function getRecentEntries(days) {

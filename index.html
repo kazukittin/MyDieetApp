@@ -131,128 +131,75 @@
     </div>
 
     <main class="app-shell">
-      <section class="hero" aria-labelledby="app-title">
-        <div class="hero-copy">
-          <p class="eyebrow">Healthy weight journey</p>
-          <h1 id="app-title">My Diet Notebook</h1>
-          <p class="lead">体重だけに振り回されず、食事・睡眠・行動を整えていくための記録帳。</p>
-          <div class="coach-strip">
-            <span>今日の整え方</span>
-            <strong id="coach-message">まず一つ、できる行動を選ぶ</strong>
-          </div>
-          <div class="hero-actions">
-            <a class="quick-log-button" href="#entry-form">今日を記録</a>
-            <button id="open-settings" class="settings-button" type="button">設定</button>
-          </div>
-        </div>
-        <div class="today-card" aria-label="今日の状態">
-          <span id="today-label"></span>
-          <strong id="streak-count">0日</strong>
-          <small id="sync-status">端末保存</small>
-        </div>
-      </section>
+      <nav class="page-nav app-tabs" aria-label="メインページ">
+        <button class="tab-button is-active" type="button" data-page-target="dashboard">ダッシュボード</button>
+        <button class="tab-button" type="button" data-page-target="weight">体重推移</button>
+        <button class="tab-button" type="button" data-page-target="exercise">運動記録</button>
+        <button class="tab-button" type="button" data-page-target="food">食事記録</button>
+        <button id="open-settings-nav" class="tab-button" type="button">設定</button>
+      </nav>
 
-      <section class="summary-grid" aria-label="今日の概要">
-        <article class="metric">
-          <span>現在体重</span>
-          <strong id="current-weight">-- kg</strong>
-          <small id="weight-trend">記録を始めましょう</small>
-        </article>
-        <article class="metric">
-          <span>7日平均</span>
-          <strong id="weekly-average">-- kg</strong>
-          <small id="weekly-average-detail">日々の上下をならして見る</small>
-        </article>
-        <article class="metric">
-          <span>行動スコア</span>
-          <strong id="weekly-score">--</strong>
-          <small id="weekly-score-detail">食事・運動・睡眠・気分</small>
-        </article>
-        <article class="metric">
-          <span>目標まで</span>
-          <strong id="goal-remaining">-- kg</strong>
-          <small id="goal-detail">初回設定で表示されます</small>
-        </article>
-        <article class="metric goal-metric">
-          <span>今日の一言</span>
-          <strong id="daily-message">焦らず整える</strong>
-          <small id="pace-detail">無理なく続くペースで</small>
-        </article>
-      </section>
-
-      <section class="workspace">
-        <form id="entry-form" class="panel entry-panel" autocomplete="off">
-          <div class="panel-heading">
-            <div>
-              <p class="section-kicker">Daily log</p>
-              <h2>今日の記録</h2>
+      <form id="entry-form" autocomplete="off">
+        <section id="dashboard-page" class="app-page is-active" data-page="dashboard">
+          <section class="hero" aria-labelledby="app-title">
+            <div class="hero-copy">
+              <p class="eyebrow">Healthy weight journey</p>
+              <h1 id="app-title">My Diet Notebook</h1>
+              <p class="lead">体重だけに振り回されず、食事・睡眠・行動を整えていくための記録帳。</p>
+              <div class="coach-strip">
+                <span>今日の整え方</span>
+                <strong id="coach-message">まず一つ、できる行動を選ぶ</strong>
+              </div>
+              <div class="hero-actions">
+                <button class="quick-log-button" type="button" data-page-target="food">今日を記録</button>
+                <button id="open-settings" class="settings-button" type="button">設定</button>
+              </div>
             </div>
-            <input type="date" id="entry-date" name="date" required>
-          </div>
-
-          <div class="field-row">
-            <label class="field-card">
-              <span>体重 kg</span>
-              <input type="number" id="weight" name="weight" min="20" max="250" step="0.1" placeholder="62.4">
-            </label>
-            <label class="field-card">
-              <span>睡眠 時間</span>
-              <input type="number" id="sleep" name="sleep" min="0" max="24" step="0.5" placeholder="7">
-            </label>
-          </div>
-
-          <fieldset class="control-group">
-            <legend>食事の整い方</legend>
-            <div class="segmented">
-              <label><input type="radio" name="meal" value="1"><span>乱れた</span></label>
-              <label><input type="radio" name="meal" value="2"><span>ふつう</span></label>
-              <label><input type="radio" name="meal" value="3" checked><span>整った</span></label>
+            <div class="today-card" aria-label="今日の状態">
+              <span id="today-label"></span>
+              <strong id="streak-count">0日</strong>
+              <small id="sync-status">端末保存</small>
             </div>
-          </fieldset>
+          </section>
 
-          <fieldset class="control-group">
-            <legend>食事ログ</legend>
-            <div class="meal-grid">
-              <label><input type="checkbox" name="meals" value="breakfast"><span><strong>朝</strong>記録した</span></label>
-              <label><input type="checkbox" name="meals" value="lunch"><span><strong>昼</strong>記録した</span></label>
-              <label><input type="checkbox" name="meals" value="dinner"><span><strong>夜</strong>記録した</span></label>
-              <label><input type="checkbox" name="meals" value="snack"><span><strong>間食</strong>整えた</span></label>
+          <section class="page-section" aria-labelledby="dashboard-heading">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker">Dashboard</p>
+                <h2 id="dashboard-heading">今日の状態</h2>
+              </div>
+              <span>数字は週単位でゆっくり見る</span>
             </div>
-          </fieldset>
-
-          <fieldset class="control-group">
-            <legend>健康行動チェック</legend>
-            <div class="checks">
-              <label><input type="checkbox" name="habits" value="water"><span>水分</span></label>
-              <label><input type="checkbox" name="habits" value="protein"><span>たんぱく質</span></label>
-              <label><input type="checkbox" name="habits" value="vegetables"><span>野菜・海藻</span></label>
-              <label><input type="checkbox" name="habits" value="walk"><span>歩く・運動</span></label>
-              <label><input type="checkbox" name="habits" value="no_snack"><span>間食控えめ</span></label>
-              <label><input type="checkbox" name="habits" value="slow_eating"><span>ゆっくり食べる</span></label>
+            <div class="summary-grid" aria-label="今日の概要">
+              <article class="metric">
+                <span>現在体重</span>
+                <strong id="current-weight">-- kg</strong>
+                <small id="weight-trend">記録を始めましょう</small>
+              </article>
+              <article class="metric">
+                <span>7日平均</span>
+                <strong id="weekly-average">-- kg</strong>
+                <small id="weekly-average-detail">日々の上下をならして見る</small>
+              </article>
+              <article class="metric">
+                <span>行動スコア</span>
+                <strong id="weekly-score">--</strong>
+                <small id="weekly-score-detail">食事・運動・睡眠・気分</small>
+              </article>
+              <article class="metric">
+                <span>目標まで</span>
+                <strong id="goal-remaining">-- kg</strong>
+                <small id="goal-detail">初回設定で表示されます</small>
+              </article>
+              <article class="metric goal-metric">
+                <span>今日の一言</span>
+                <strong id="daily-message">焦らず整える</strong>
+                <small id="pace-detail">無理なく続くペースで</small>
+              </article>
             </div>
-          </fieldset>
+          </section>
 
-          <label>
-            <span>気分</span>
-            <select id="mood" name="mood">
-              <option value="calm">落ち着いている</option>
-              <option value="good">調子がいい</option>
-              <option value="tired">疲れている</option>
-              <option value="hungry">空腹感が強い</option>
-              <option value="stress">ストレス多め</option>
-            </select>
-          </label>
-
-          <label>
-            <span>メモ</span>
-            <textarea id="note" name="note" rows="4" placeholder="食べたもの、体調、明日の自分に残したいこと"></textarea>
-          </label>
-
-          <button class="primary-button" type="submit">記録する</button>
-        </form>
-
-        <aside class="side-stack">
-          <section class="panel insights">
+          <section class="panel insights dashboard-coach">
             <div class="panel-heading">
               <div>
                 <p class="section-kicker">Coach</p>
@@ -275,36 +222,148 @@
               </div>
             </div>
           </section>
+        </section>
 
-        </aside>
-      </section>
-
-      <section class="panel chart-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">Trend</p>
-            <h2>体重の推移</h2>
+        <section id="weight-page" class="app-page" data-page="weight">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Weight</p>
+              <h2>体重推移画面</h2>
+            </div>
+            <span>日々の増減より流れを見る</span>
           </div>
-          <span class="chart-legend"><i></i>体重 <b></b>7日平均</span>
-        </div>
-        <div class="chart-wrap">
-          <svg id="weight-chart" class="weight-chart" viewBox="0 0 720 280" role="img" aria-labelledby="weight-chart-title">
-            <title id="weight-chart-title">体重の推移グラフ</title>
-          </svg>
-        </div>
-        <p id="chart-empty" class="empty">体重を2回以上記録すると推移グラフが表示されます。</p>
-      </section>
 
-      <section class="panel history-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">History</p>
-            <h2>記録履歴</h2>
+          <section class="workspace single-column">
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">Weight log</p>
+                  <h2>体重と睡眠を記録</h2>
+                </div>
+                <input type="date" id="entry-date" name="date" required>
+              </div>
+              <div class="field-row">
+                <label class="field-card">
+                  <span>体重 kg</span>
+                  <input type="number" id="weight" name="weight" min="20" max="250" step="0.1" placeholder="62.4">
+                </label>
+                <label class="field-card">
+                  <span>睡眠 時間</span>
+                  <input type="number" id="sleep" name="sleep" min="0" max="24" step="0.5" placeholder="7">
+                </label>
+              </div>
+              <button class="primary-button" type="submit" data-save-scope="weight">体重を保存</button>
+            </section>
+
+            <section class="panel chart-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">Trend</p>
+                  <h2>体重の推移</h2>
+                </div>
+                <span class="chart-legend"><i></i>体重 <b></b>7日平均</span>
+              </div>
+              <div class="chart-wrap">
+                <svg id="weight-chart" class="weight-chart" viewBox="0 0 720 280" role="img" aria-labelledby="weight-chart-title">
+                  <title id="weight-chart-title">体重の推移グラフ</title>
+                </svg>
+              </div>
+              <p id="chart-empty" class="empty">体重を2回以上記録すると推移グラフが表示されます。</p>
+            </section>
+
+            <section class="panel history-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">History</p>
+                  <h2>記録履歴</h2>
+                </div>
+                <button id="export-data" class="ghost-button" type="button">書き出す</button>
+              </div>
+              <div class="history-list" id="history-list"></div>
+            </section>
+          </section>
+        </section>
+
+        <section id="exercise-page" class="app-page" data-page="exercise">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Exercise</p>
+              <h2>運動記録画面</h2>
+            </div>
+            <span>短い運動もちゃんと積み上げる</span>
           </div>
-          <button id="export-data" class="ghost-button" type="button">書き出す</button>
-        </div>
-        <div class="history-list" id="history-list"></div>
-      </section>
+          <section class="panel">
+            <fieldset class="control-group">
+              <legend>今日の運動・活動</legend>
+              <div class="checks activity-checks">
+                <label><input type="checkbox" name="habits" value="walk"><span>歩く・運動</span></label>
+                <label><input type="checkbox" name="habits" value="stretch"><span>ストレッチ</span></label>
+                <label><input type="checkbox" name="habits" value="strength"><span>筋トレ</span></label>
+              </div>
+            </fieldset>
+            <button class="primary-button" type="submit" data-save-scope="exercise">運動を保存</button>
+          </section>
+        </section>
+
+        <section id="food-page" class="app-page" data-page="food">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Food</p>
+              <h2>食事記録画面</h2>
+            </div>
+            <span>カロリーより、整える行動から</span>
+          </div>
+          <section class="panel entry-panel">
+            <fieldset class="control-group">
+              <legend>食事の整い方</legend>
+              <div class="segmented">
+                <label><input type="radio" name="meal" value="1"><span>乱れた</span></label>
+                <label><input type="radio" name="meal" value="2"><span>ふつう</span></label>
+                <label><input type="radio" name="meal" value="3" checked><span>整った</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="control-group">
+              <legend>食事ログ</legend>
+              <div class="meal-grid">
+                <label><input type="checkbox" name="meals" value="breakfast"><span><strong>朝</strong>記録した</span></label>
+                <label><input type="checkbox" name="meals" value="lunch"><span><strong>昼</strong>記録した</span></label>
+                <label><input type="checkbox" name="meals" value="dinner"><span><strong>夜</strong>記録した</span></label>
+                <label><input type="checkbox" name="meals" value="snack"><span><strong>間食</strong>整えた</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="control-group">
+              <legend>健康行動チェック</legend>
+              <div class="checks">
+                <label><input type="checkbox" name="habits" value="water"><span>水分</span></label>
+                <label><input type="checkbox" name="habits" value="protein"><span>たんぱく質</span></label>
+                <label><input type="checkbox" name="habits" value="vegetables"><span>野菜・海藻</span></label>
+                <label><input type="checkbox" name="habits" value="no_snack"><span>間食控えめ</span></label>
+                <label><input type="checkbox" name="habits" value="slow_eating"><span>ゆっくり食べる</span></label>
+              </div>
+            </fieldset>
+
+            <label>
+              <span>気分</span>
+              <select id="mood" name="mood">
+                <option value="calm">落ち着いている</option>
+                <option value="good">調子がいい</option>
+                <option value="tired">疲れている</option>
+                <option value="hungry">空腹感が強い</option>
+                <option value="stress">ストレス多め</option>
+              </select>
+            </label>
+
+            <label>
+              <span>メモ</span>
+              <textarea id="note" name="note" rows="4" placeholder="食べたもの、体調、明日の自分に残したいこと"></textarea>
+            </label>
+
+            <button class="primary-button" type="submit" data-save-scope="food">食事を保存</button>
+          </section>
+        </section>
+      </form>
     </main>
 
     <script src="app.js"></script>

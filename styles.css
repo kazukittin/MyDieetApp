@@ -29,6 +29,10 @@ body {
   font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 button,
 input,
 select,
@@ -44,6 +48,61 @@ button {
   width: min(1160px, calc(100% - 32px));
   margin: 0 auto;
   padding: 28px 0 40px;
+}
+
+.page-nav {
+  position: sticky;
+  top: 10px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 14px auto;
+  border: 1px solid rgba(227, 221, 211, 0.86);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 12px 30px rgba(35, 45, 58, 0.08);
+  padding: 7px;
+  overflow-x: auto;
+  backdrop-filter: blur(14px);
+}
+
+.page-nav a,
+.page-nav button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  padding: 7px 11px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.page-nav a:hover,
+.page-nav button:hover,
+.page-nav .is-active {
+  background: var(--green-soft);
+  color: #1d5a3c;
+}
+
+.app-page {
+  display: none;
+}
+
+.app-page.is-active {
+  display: block;
+}
+
+.app-tabs {
+  width: 100%;
+  justify-content: flex-start;
+  margin-left: 0;
 }
 
 .onboarding {
@@ -156,6 +215,28 @@ button {
   gap: 18px;
   align-items: stretch;
   margin-bottom: 18px;
+}
+
+.page-section {
+  scroll-margin-top: 84px;
+  margin-top: 18px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-heading h2 {
+  font-size: 1.35rem;
+}
+
+.section-heading span {
+  color: var(--muted);
+  font-weight: 750;
 }
 
 .hero-copy {
@@ -300,7 +381,7 @@ h2 {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 0;
 }
 
 .metric {
@@ -327,6 +408,14 @@ h2 {
   align-items: start;
 }
 
+.workspace.single-column {
+  grid-template-columns: 1fr;
+}
+
+.workspace-section {
+  margin-top: 22px;
+}
+
 .side-stack {
   display: grid;
   gap: 18px;
@@ -347,6 +436,10 @@ h2 {
 form {
   display: grid;
   gap: 16px;
+}
+
+#entry-form {
+  display: block;
 }
 
 .field-row {
@@ -757,6 +850,11 @@ legend {
     padding: 18px 0 28px;
   }
 
+  .page-nav {
+    width: 100%;
+    margin-left: 0;
+  }
+
   .hero,
   .workspace,
   .field-row {
@@ -821,6 +919,11 @@ legend {
 
   .settings-header .ghost-button {
     width: 100%;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
