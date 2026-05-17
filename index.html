@@ -178,6 +178,36 @@
             </div>
           </section>
 
+          <section class="panel calorie-panel" aria-labelledby="calorie-heading">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Calories</p>
+                <h2 id="calorie-heading">カロリーバランス</h2>
+              </div>
+              <span id="calorie-balance-label" class="calorie-balance-label">記録すると表示されます</span>
+            </div>
+            <div class="calorie-chart" aria-label="摂取カロリーと消費カロリー">
+              <div class="calorie-row">
+                <div>
+                  <span>摂取</span>
+                  <strong id="intake-calorie-label">-- kcal</strong>
+                </div>
+                <div class="calorie-track">
+                  <div id="intake-calorie-bar" class="calorie-fill intake-fill"></div>
+                </div>
+              </div>
+              <div class="calorie-row">
+                <div>
+                  <span>消費</span>
+                  <strong id="burn-calorie-label">-- kcal</strong>
+                </div>
+                <div class="calorie-track">
+                  <div id="burn-calorie-bar" class="calorie-fill burn-fill"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="panel insights dashboard-coach">
             <div class="panel-heading">
               <div>
@@ -273,6 +303,12 @@
             <span>短い運動もちゃんと積み上げる</span>
           </div>
           <section class="panel">
+            <div class="field-row">
+              <label class="field-card">
+                <span>消費カロリー kcal</span>
+                <input type="number" id="burn-calories" name="burnCalories" min="0" max="5000" step="1" placeholder="250">
+              </label>
+            </div>
             <fieldset class="control-group">
               <legend>今日の運動・活動</legend>
               <div class="checks activity-checks">
@@ -295,6 +331,13 @@
             <span>カロリーより、整える行動から</span>
           </div>
           <section class="panel entry-panel">
+            <div class="field-row">
+              <label class="field-card">
+                <span>摂取カロリー kcal</span>
+                <input type="number" id="intake-calories" name="intakeCalories" min="0" max="8000" step="1" placeholder="1800">
+              </label>
+            </div>
+
             <fieldset class="control-group">
               <legend>食事の整い方</legend>
               <div class="segmented">

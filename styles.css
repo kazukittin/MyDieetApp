@@ -401,6 +401,73 @@ h2 {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), var(--coral-soft));
 }
 
+.calorie-panel {
+  margin-top: 18px;
+}
+
+.calorie-balance-label {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 850;
+}
+
+.calorie-balance-label.is-plus {
+  background: var(--coral-soft);
+  color: #914935;
+}
+
+.calorie-balance-label.is-minus {
+  background: var(--green-soft);
+  color: #1d5a3c;
+}
+
+.calorie-chart {
+  display: grid;
+  gap: 16px;
+}
+
+.calorie-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.calorie-row span {
+  display: block;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.calorie-row strong {
+  font-size: 1.2rem;
+}
+
+.calorie-track {
+  height: 22px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eee8df;
+}
+
+.calorie-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+.intake-fill {
+  background: linear-gradient(90deg, var(--coral), #d89559);
+}
+
+.burn-fill {
+  background: linear-gradient(90deg, var(--green), var(--blue));
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.28fr) minmax(330px, 0.82fr);
@@ -910,6 +977,11 @@ legend {
 
   .metric {
     min-height: 108px;
+  }
+
+  .calorie-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .history-item {

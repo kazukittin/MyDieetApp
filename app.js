@@ -64,6 +64,8 @@ form.addEventListener("submit", (event) => {
     date,
     weight: previous?.weight ?? null,
     sleep: previous?.sleep ?? null,
+    intakeCalories: previous?.intakeCalories ?? null,
+    burnCalories: previous?.burnCalories ?? null,
     meal: previous?.meal ?? 2,
     meals: previous?.meals ?? [],
     habits: previous?.habits ?? [],
@@ -82,6 +84,7 @@ form.addEventListener("submit", (event) => {
     const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
     const selectedFood = selectedHabits.filter((habit) => foodHabitValues.includes(habit));
     entry.meal = Number(formData.get("meal") || 2);
+    entry.intakeCalories = numberOrNull(formData.get("intakeCalories"));
     entry.meals = formData.getAll("meals");
     entry.habits = [...new Set([...preservedExercise, ...selectedFood])];
     entry.mood = formData.get("mood");
@@ -92,6 +95,7 @@ form.addEventListener("submit", (event) => {
     const selectedHabits = formData.getAll("habits");
     const preservedFood = entry.habits.filter((habit) => foodHabitValues.includes(habit));
     const selectedExercise = selectedHabits.filter((habit) => exerciseHabitValues.includes(habit));
+    entry.burnCalories = numberOrNull(formData.get("burnCalories"));
     entry.habits = [...new Set([...preservedFood, ...selectedExercise])];
   }
 
@@ -194,6 +198,8 @@ onboardingForm.addEventListener("submit", (event) => {
       date: isoToday,
       weight: setupWeight,
       sleep: null,
+      intakeCalories: null,
+      burnCalories: null,
       meal: 3,
       meals: [],
       habits: ["water"],
@@ -610,19 +616,44 @@ function renderSummary() {
 
   document.querySelector("#weight-trend").textContent = getWeightTrend(latestWithWeight, previousWithWeight);
 
+  const selected = entries.find((entry) => entry.date === dateInput.value);
   const weekEntries = getRecentEntries(7);
   const score = weekEntries.length ? Math.round(weekEntries.reduce((sum, entry) => sum + scoreEntry(entry), 0) / weekEntries.length) : null;
   document.querySelector("#weekly-score").textContent = score === null ? "--" : `${score}点`;
   document.querySelector("#weekly-score-detail").textContent = getScoreDetail(score);
   renderWeeklyAverage(weekEntries);
+  renderCalorieDashboard(selected);
 
   const habitRatio = getHabitRatio(weekEntries);
   document.querySelector("#habit-progress").style.width = `${habitRatio}%`;
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
-  const selected = entries.find((entry) => entry.date === dateInput.value);
   const dailyMessage = getDailyMessage(score, selected);
   document.querySelector("#daily-message").textContent = dailyMessage;
   renderGoalSummary(latestWithWeight);
+}
+
+function renderCalorieDashboard(entry) {
+  const intake = entry?.intakeCalories ?? null;
+  const burn = entry?.burnCalories ?? null;
+  const maxValue = Math.max(intake || 0, burn || 0, 1);
+  const intakePercent = intake === null ? 0 : Math.max(4, Math.round((intake / maxValue) * 100));
+  const burnPercent = burn === null ? 0 : Math.max(4, Math.round((burn / maxValue) * 100));
+
+  document.querySelector("#intake-calorie-label").textContent = intake === null ? "-- kcal" : `${Math.round(intake)} kcal`;
+  document.querySelector("#burn-calorie-label").textContent = burn === null ? "-- kcal" : `${Math.round(burn)} kcal`;
+  document.querySelector("#intake-calorie-bar").style.width = `${intakePercent}%`;
+  document.querySelector("#burn-calorie-bar").style.width = `${burnPercent}%`;
+
+  const balanceLabel = document.querySelector("#calorie-balance-label");
+  if (intake === null && burn === null) {
+    balanceLabel.textContent = "記録すると表示されます";
+    balanceLabel.className = "calorie-balance-label";
+    return;
+  }
+
+  const diff = (intake || 0) - (burn || 0);
+  balanceLabel.textContent = diff >= 0 ? `差分 +${Math.round(diff)} kcal` : `差分 ${Math.round(diff)} kcal`;
+  balanceLabel.className = `calorie-balance-label ${diff > 0 ? "is-plus" : "is-minus"}`;
 }
 
 function renderWeeklyAverage(weekEntries) {
@@ -684,12 +715,13 @@ function renderHistory() {
     .map((entry) => {
       const weight = entry.weight === null ? "体重未入力" : `${entry.weight.toFixed(1)}kg`;
       const sleep = entry.sleep === null ? "睡眠未入力" : `${entry.sleep}時間睡眠`;
+      const calories = getCalorieLabel(entry);
       const habits = entry.habits.length ? `${entry.habits.length}個の行動` : "行動チェックなし";
       const meals = getMealLogLabel(entry.meals || []);
       return `
         <article class="history-item">
           <div class="history-date">${formatDateLabel(entry.date)}</div>
-          <div class="history-detail">${weight} / ${sleep} / ${meals} / ${habits}</div>
+          <div class="history-detail">${weight} / ${sleep} / ${calories} / ${meals} / ${habits}</div>
           <div class="score-pill">${scoreEntry(entry)}点</div>
         </article>
       `;
@@ -764,6 +796,8 @@ function fillFormForDate(date, overwrite = true) {
   dateInput.value = date;
   document.querySelector("#weight").value = entry.weight ?? "";
   document.querySelector("#sleep").value = entry.sleep ?? "";
+  document.querySelector("#intake-calories").value = entry.intakeCalories ?? "";
+  document.querySelector("#burn-calories").value = entry.burnCalories ?? "";
   document.querySelector(`input[name="meal"][value="${entry.meal}"]`).checked = true;
   document.querySelector("#mood").value = entry.mood;
   document.querySelector("#note").value = entry.note;
@@ -894,6 +928,15 @@ function getMealLogLabel(meals) {
   if (!meals.length) return "食事ログなし";
   const labels = { breakfast: "朝", lunch: "昼", dinner: "夜", snack: "間食" };
   return meals.map((meal) => labels[meal]).filter(Boolean).join("・");
+}
+
+function getCalorieLabel(entry) {
+  const intake = entry.intakeCalories ?? null;
+  const burn = entry.burnCalories ?? null;
+  if (intake === null && burn === null) return "カロリー未入力";
+  const intakeText = intake === null ? "--" : Math.round(intake);
+  const burnText = burn === null ? "--" : Math.round(burn);
+  return `摂取${intakeText} / 消費${burnText}kcal`;
 }
 
 function getScoreDetail(score) {
