@@ -635,25 +635,89 @@ function renderSummary() {
 function renderCalorieDashboard(entry) {
   const intake = entry?.intakeCalories ?? null;
   const burn = entry?.burnCalories ?? null;
-  const maxValue = Math.max(intake || 0, burn || 0, 1);
-  const intakePercent = intake === null ? 0 : Math.max(4, Math.round((intake / maxValue) * 100));
-  const burnPercent = burn === null ? 0 : Math.max(4, Math.round((burn / maxValue) * 100));
 
   document.querySelector("#intake-calorie-label").textContent = intake === null ? "-- kcal" : `${Math.round(intake)} kcal`;
   document.querySelector("#burn-calorie-label").textContent = burn === null ? "-- kcal" : `${Math.round(burn)} kcal`;
-  document.querySelector("#intake-calorie-bar").style.width = `${intakePercent}%`;
-  document.querySelector("#burn-calorie-bar").style.width = `${burnPercent}%`;
 
   const balanceLabel = document.querySelector("#calorie-balance-label");
   if (intake === null && burn === null) {
     balanceLabel.textContent = "記録すると表示されます";
     balanceLabel.className = "calorie-balance-label";
+  } else {
+    const diff = (intake || 0) - (burn || 0);
+    balanceLabel.textContent = diff >= 0 ? `差分 +${Math.round(diff)} kcal` : `差分 ${Math.round(diff)} kcal`;
+    balanceLabel.className = `calorie-balance-label ${diff > 0 ? "is-plus" : "is-minus"}`;
+  }
+
+  renderCalorieComboChart();
+}
+
+function renderCalorieComboChart() {
+  const svg = document.querySelector("#calorie-combo-chart");
+  const empty = document.querySelector("#calorie-chart-empty");
+  const points = entries
+    .filter((item) => item.intakeCalories !== null || item.burnCalories !== null)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-14);
+
+  svg.innerHTML = '<title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ</title>';
+  if (!points.length) {
+    svg.hidden = true;
+    empty.hidden = false;
     return;
   }
 
-  const diff = (intake || 0) - (burn || 0);
-  balanceLabel.textContent = diff >= 0 ? `差分 +${Math.round(diff)} kcal` : `差分 ${Math.round(diff)} kcal`;
-  balanceLabel.className = `calorie-balance-label ${diff > 0 ? "is-plus" : "is-minus"}`;
+  svg.hidden = false;
+  empty.hidden = true;
+
+  const width = 720;
+  const height = 260;
+  const pad = { top: 24, right: 24, bottom: 42, left: 58 };
+  const values = points.flatMap((point) => [point.intakeCalories, point.burnCalories]).filter((value) => value !== null);
+  const max = Math.max(500, Math.ceil(Math.max(...values) / 250) * 250);
+  const innerWidth = width - pad.left - pad.right;
+  const innerHeight = height - pad.top - pad.bottom;
+  const step = innerWidth / Math.max(1, points.length);
+  const barWidth = Math.min(32, Math.max(14, step * 0.45));
+  const xCenter = (index) => pad.left + step * index + step / 2;
+  const y = (value) => pad.top + innerHeight - ((value || 0) / max) * innerHeight;
+  let intakeIndex = 0;
+  const linePoints = points
+    .map((point, index) => {
+      if (point.intakeCalories === null) return null;
+      const command = intakeIndex === 0 ? "M" : "L";
+      intakeIndex += 1;
+      return `${command} ${xCenter(index).toFixed(1)} ${y(point.intakeCalories).toFixed(1)}`;
+    })
+    .filter(Boolean)
+    .join(" ");
+  const bars = points.map((point, index) => {
+    const value = point.burnCalories || 0;
+    const barHeight = Math.max(0, pad.top + innerHeight - y(value));
+    const x = xCenter(index) - barWidth / 2;
+    return `<rect class="calorie-burn-bar" x="${x.toFixed(1)}" y="${y(value).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" rx="6"><title>${formatDateLabel(point.date)} 消費 ${Math.round(value)}kcal</title></rect>`;
+  }).join("");
+  const dots = points
+    .map((point, index) => point.intakeCalories === null ? "" : `<circle class="calorie-intake-dot" cx="${xCenter(index).toFixed(1)}" cy="${y(point.intakeCalories).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 摂取 ${Math.round(point.intakeCalories)}kcal</title></circle>`)
+    .join("");
+  const grid = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const value = Math.round(max * (1 - ratio));
+    const yy = pad.top + innerHeight * ratio;
+    return `<g><line class="chart-grid" x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}"></line><text class="chart-label" x="10" y="${yy + 4}">${value}</text></g>`;
+  }).join("");
+  const labels = points.map((point, index) => {
+    if (points.length > 7 && index % 2 === 1 && index !== points.length - 1) return "";
+    return `<text class="chart-label" x="${xCenter(index).toFixed(1)}" y="${height - 12}" text-anchor="middle">${formatShortDate(point.date)}</text>`;
+  }).join("");
+
+  svg.insertAdjacentHTML("beforeend", `
+    ${grid}
+    ${bars}
+    <path class="calorie-intake-line" d="${linePoints}"></path>
+    ${dots}
+    ${labels}
+  `);
 }
 
 function renderWeeklyAverage(weekEntries) {

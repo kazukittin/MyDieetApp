@@ -424,48 +424,57 @@ h2 {
   color: #1d5a3c;
 }
 
-.calorie-chart {
+.calorie-summary {
   display: grid;
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
-.calorie-row {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
+.calorie-summary div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  padding: 12px;
 }
 
-.calorie-row span {
+.calorie-summary span {
   display: block;
   color: var(--muted);
   font-weight: 800;
 }
 
-.calorie-row strong {
-  font-size: 1.2rem;
+.calorie-summary strong {
+  font-size: 1.25rem;
 }
 
-.calorie-track {
-  height: 22px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #eee8df;
+.calorie-chart-wrap {
+  width: 100%;
+  overflow-x: auto;
 }
 
-.calorie-fill {
-  width: 0%;
-  height: 100%;
-  border-radius: inherit;
-  transition: width 180ms ease;
+.calorie-combo-chart {
+  width: 100%;
+  min-width: 620px;
+  display: block;
 }
 
-.intake-fill {
-  background: linear-gradient(90deg, var(--coral), #d89559);
+.calorie-burn-bar {
+  fill: rgba(47, 133, 90, 0.7);
 }
 
-.burn-fill {
-  background: linear-gradient(90deg, var(--green), var(--blue));
+.calorie-intake-line {
+  fill: none;
+  stroke: var(--coral);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.calorie-intake-dot {
+  fill: #fffdfa;
+  stroke: var(--coral);
+  stroke-width: 3;
 }
 
 .workspace {
@@ -979,9 +988,8 @@ legend {
     min-height: 108px;
   }
 
-  .calorie-row {
+  .calorie-summary {
     grid-template-columns: 1fr;
-    gap: 8px;
   }
 
   .history-item {

@@ -186,26 +186,16 @@
               </div>
               <span id="calorie-balance-label" class="calorie-balance-label">記録すると表示されます</span>
             </div>
-            <div class="calorie-chart" aria-label="摂取カロリーと消費カロリー">
-              <div class="calorie-row">
-                <div>
-                  <span>摂取</span>
-                  <strong id="intake-calorie-label">-- kcal</strong>
-                </div>
-                <div class="calorie-track">
-                  <div id="intake-calorie-bar" class="calorie-fill intake-fill"></div>
-                </div>
-              </div>
-              <div class="calorie-row">
-                <div>
-                  <span>消費</span>
-                  <strong id="burn-calorie-label">-- kcal</strong>
-                </div>
-                <div class="calorie-track">
-                  <div id="burn-calorie-bar" class="calorie-fill burn-fill"></div>
-                </div>
-              </div>
+            <div class="calorie-summary">
+              <div><span>摂取</span><strong id="intake-calorie-label">-- kcal</strong></div>
+              <div><span>消費</span><strong id="burn-calorie-label">-- kcal</strong></div>
             </div>
+            <div class="calorie-chart-wrap">
+              <svg id="calorie-combo-chart" class="calorie-combo-chart" viewBox="0 0 720 260" role="img" aria-labelledby="calorie-chart-title">
+                <title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ</title>
+              </svg>
+            </div>
+            <p id="calorie-chart-empty" class="empty">摂取カロリーか消費カロリーを記録するとグラフが表示されます。</p>
           </section>
 
           <section class="panel insights dashboard-coach">
