@@ -430,6 +430,13 @@ h2 {
   gap: 12px;
 }
 
+.preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .exercise-preset-list {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
