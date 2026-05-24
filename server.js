@@ -124,11 +124,19 @@ function ensureDataFile() {
 
 function normalizeEntry(entry) {
   if (!entry || typeof entry !== "object" || typeof entry.date !== "string") return null;
+  const weightMorning = numberOrNull(entry.weightMorning);
+  const weightNight = numberOrNull(entry.weightNight);
+  const weight = weightNight ?? weightMorning ?? numberOrNull(entry.weight);
   return {
     date: entry.date,
-    weight: numberOrNull(entry.weight),
+    weight,
+    weightMorning,
+    weightNight,
     sleep: numberOrNull(entry.sleep),
+    intakeCalories: numberOrNull(entry.intakeCalories),
+    burnCalories: numberOrNull(entry.burnCalories),
     meal: clampNumber(entry.meal, 1, 3, 2),
+    meals: Array.isArray(entry.meals) ? entry.meals.filter((item) => typeof item === "string") : [],
     habits: Array.isArray(entry.habits) ? entry.habits.filter((item) => typeof item === "string") : [],
     mood: typeof entry.mood === "string" ? entry.mood : "calm",
     note: typeof entry.note === "string" ? entry.note : "",

@@ -127,6 +127,15 @@
             </form>
           </section>
 
+          <section class="settings-section">
+            <h3>デモデータ</h3>
+            <p>朝と夜の体重を含む仮データで、画面の見え方を確認できます。</p>
+            <div class="demo-actions">
+              <button id="load-demo-data" class="primary-button" type="button">デモデータを入れる</button>
+            </div>
+            <p id="demo-feedback" class="cloud-feedback" role="status" aria-live="polite">本番データの代わりに見た目確認用として使えます。</p>
+          </section>
+
         </div>
       </section>
     </div>
@@ -255,14 +264,18 @@
               <div class="panel-heading">
                 <div>
                   <p class="section-kicker">Weight log</p>
-                  <h2>体重と睡眠を記録</h2>
+                  <h2>朝・夜の体重と睡眠を記録</h2>
                 </div>
                 <input type="date" id="entry-date" name="date" required>
               </div>
               <div class="field-row">
                 <label class="field-card">
-                  <span>体重 kg</span>
-                  <input type="number" id="weight" name="weight" min="20" max="250" step="0.1" placeholder="62.4">
+                  <span>朝の体重 kg</span>
+                  <input type="number" id="weight-morning" name="weightMorning" min="20" max="250" step="0.1" placeholder="62.4">
+                </label>
+                <label class="field-card">
+                  <span>夜の体重 kg</span>
+                  <input type="number" id="weight-night" name="weightNight" min="20" max="250" step="0.1" placeholder="62.8">
                 </label>
                 <label class="field-card">
                   <span>睡眠 時間</span>
@@ -270,7 +283,7 @@
                 </label>
               </div>
               <button class="primary-button" type="submit" data-save-scope="weight">体重を保存</button>
-              <p id="weight-save-feedback" class="save-feedback" role="status" aria-live="polite">体重を入力して保存できます。</p>
+              <p id="weight-save-feedback" class="save-feedback" role="status" aria-live="polite">朝か夜の体重を入力して保存できます。</p>
             </section>
 
             <section class="panel chart-panel">
@@ -279,7 +292,7 @@
                   <p class="section-kicker">Trend</p>
                   <h2>体重の推移</h2>
                 </div>
-                <span class="chart-legend"><i></i>体重 <b></b>7日平均</span>
+                <span class="chart-legend"><i></i>代表体重 <b></b>7日平均</span>
               </div>
               <div class="chart-wrap">
                 <svg id="weight-chart" class="weight-chart" viewBox="0 0 720 280" role="img" aria-labelledby="weight-chart-title">

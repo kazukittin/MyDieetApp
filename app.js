@@ -19,6 +19,8 @@ const openSettingsButton = document.querySelector("#open-settings");
 const closeSettingsButton = document.querySelector("#close-settings");
 const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
+const loadDemoDataButton = document.querySelector("#load-demo-data");
+const demoFeedback = document.querySelector("#demo-feedback");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
@@ -65,6 +67,8 @@ form.addEventListener("submit", (event) => {
   const entry = {
     date,
     weight: previous?.weight ?? null,
+    weightMorning: previous?.weightMorning ?? null,
+    weightNight: previous?.weightNight ?? null,
     sleep: previous?.sleep ?? null,
     intakeCalories: previous?.intakeCalories ?? null,
     burnCalories: previous?.burnCalories ?? null,
@@ -77,7 +81,9 @@ form.addEventListener("submit", (event) => {
   };
 
   if (scope === "weight" || scope === "all") {
-    entry.weight = numberOrNull(formData.get("weight"));
+    entry.weightMorning = numberOrNull(formData.get("weightMorning"));
+    entry.weightNight = numberOrNull(formData.get("weightNight"));
+    entry.weight = getPrimaryWeight(entry);
     entry.sleep = numberOrNull(formData.get("sleep"));
   }
 
@@ -206,6 +212,8 @@ onboardingForm.addEventListener("submit", (event) => {
     entries.push({
       date: isoToday,
       weight: setupWeight,
+      weightMorning: setupWeight,
+      weightNight: null,
       sleep: null,
       intakeCalories: null,
       burnCalories: null,
@@ -256,9 +264,25 @@ profileForm.addEventListener("submit", (event) => {
   }
 });
 
+loadDemoDataButton.addEventListener("click", () => {
+  const shouldLoad = confirm("現在の端末内データをデモデータに置き換えます。クラウドには同期しません。");
+  if (!shouldLoad) return;
+  const demo = buildDemoData();
+  entries = demo.entries;
+  profile = demo.profile;
+  localStorage.setItem(storageKey, JSON.stringify(entries));
+  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  fillProfileForm();
+  fillFormForDate(isoToday);
+  render();
+  setDemoFeedback("success", "朝・夜の体重入りデモデータを入れました。");
+  switchPage("dashboard");
+});
+
 function loadEntries() {
   try {
-    return JSON.parse(localStorage.getItem(storageKey)) || [];
+    const stored = JSON.parse(localStorage.getItem(storageKey)) || [];
+    return Array.isArray(stored) ? stored.map(normalizeEntryWeights) : [];
   } catch {
     return [];
   }
@@ -291,6 +315,28 @@ function loadProfile() {
   } catch {
     return {};
   }
+}
+
+function normalizeEntryWeights(entry) {
+  if (!entry || typeof entry !== "object") return entry;
+  const weightMorning = numberOrNull(entry.weightMorning);
+  const weightNight = numberOrNull(entry.weightNight);
+  const weight = numberOrNull(entry.weight);
+  return {
+    ...entry,
+    weightMorning,
+    weightNight,
+    weight: weightNight ?? weightMorning ?? weight,
+  };
+}
+
+function getPrimaryWeight(entry) {
+  if (!entry) return null;
+  return numberOrNull(entry.weightNight) ?? numberOrNull(entry.weightMorning) ?? numberOrNull(entry.weight);
+}
+
+function hasWeightEntry(entry) {
+  return getPrimaryWeight(entry) !== null;
 }
 
 function showOnboardingIfNeeded() {
@@ -386,9 +432,11 @@ async function pushEntriesToServer() {
 function mergeEntries(localEntries, serverEntries) {
   const byDate = new Map();
   [...serverEntries, ...localEntries].forEach((entry) => {
-    const current = byDate.get(entry.date);
+    const normalized = normalizeEntryWeights(entry);
+    if (!normalized?.date) return;
+    const current = byDate.get(normalized.date);
     if (!current || new Date(entry.updatedAt || 0) > new Date(current.updatedAt || 0)) {
-      byDate.set(entry.date, entry);
+      byDate.set(normalized.date, normalized);
     }
   });
   return Array.from(byDate.values());
@@ -520,6 +568,66 @@ function setProfileFeedback(type, message) {
   profileFeedback.className = `cloud-feedback is-${type}`;
 }
 
+function setDemoFeedback(type, message) {
+  demoFeedback.textContent = message;
+  demoFeedback.className = `cloud-feedback is-${type}`;
+}
+
+function buildDemoData() {
+  const demoEntries = [];
+  const baseWeight = 72.4;
+  const start = new Date(today);
+  start.setDate(start.getDate() - 13);
+  const intakeValues = [2050, 1980, 2140, 1900, 2020, 1850, 1970, 1930, 1880, 1990, 1820, 1900, 1760, 1840];
+  const burnValues = [260, 340, 220, 410, 300, 520, 280, 360, 430, 310, 540, 380, 460, 420];
+  const sleepValues = [6.5, 7, 6, 7.5, 6.5, 8, 7, 6, 7.5, 6.5, 7, 8, 7.5, 7];
+  const moods = ["calm", "good", "tired", "calm", "good", "good", "calm", "stress", "calm", "good", "good", "calm", "good", "calm"];
+
+  for (let index = 0; index < 14; index += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const morningWeight = baseWeight - index * 0.13 + (index % 3 === 0 ? 0.15 : index % 4 === 0 ? -0.08 : 0);
+    const nightWeight = morningWeight + 0.35 + (index % 4 === 0 ? 0.1 : 0);
+    const habits = ["water", "protein", "vegetables"];
+    if (index % 2 === 0) habits.push("walk");
+    if (index % 3 !== 0) habits.push("no_snack");
+    if (index % 4 !== 0) habits.push("slow_eating");
+    if (index % 5 === 0) habits.push("stretch");
+
+    demoEntries.push({
+      date: toIsoDate(date),
+      weightMorning: Number(morningWeight.toFixed(1)),
+      weightNight: Number(nightWeight.toFixed(1)),
+      weight: Number(nightWeight.toFixed(1)),
+      sleep: sleepValues[index],
+      intakeCalories: intakeValues[index],
+      burnCalories: burnValues[index],
+      meal: index % 5 === 0 ? 2 : 3,
+      meals: index % 4 === 0 ? ["breakfast", "lunch", "dinner"] : ["breakfast", "lunch", "dinner", "snack"],
+      habits,
+      mood: moods[index],
+      note: index === 13 ? "デモ: 朝と夜の体重差を見ながら整える。" : "",
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  const sortedEntries = demoEntries.sort((a, b) => b.date.localeCompare(a.date));
+
+  return {
+    entries: sortedEntries,
+    profile: {
+      startDate: sortedEntries[sortedEntries.length - 1].date,
+      startWeight: 72.4,
+      goalWeight: 68,
+      height: 170,
+      pace: "steady",
+      note: "デモ: 朝体重を基準に、夜体重も記録する",
+      skipped: false,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+}
+
 function setSaveFeedback(scope, type, message) {
   const targets = scope === "all"
     ? ["weight", "exercise", "food"]
@@ -613,13 +721,14 @@ function render() {
 }
 
 function renderSummary() {
-  const latestWithWeight = entries.find((entry) => entry.weight !== null);
+  const latestWithWeight = entries.find(hasWeightEntry);
+  const latestWeight = getPrimaryWeight(latestWithWeight);
   document.querySelector("#current-weight").textContent = latestWithWeight
-    ? `${latestWithWeight.weight.toFixed(1)} kg`
+    ? `${latestWeight.toFixed(1)} kg`
     : "-- kg";
 
   const previousWithWeight = entries
-    .filter((entry) => entry.weight !== null && entry.date !== latestWithWeight?.date)
+    .filter((entry) => hasWeightEntry(entry) && entry.date !== latestWithWeight?.date)
     .at(0);
 
   document.querySelector("#weight-trend").textContent = getWeightTrend(latestWithWeight, previousWithWeight);
@@ -640,7 +749,7 @@ function renderSummary() {
 }
 
 function renderDailyStatus(entry) {
-  setStatusPill("#weight-status-pill", "体重", entry?.weight !== null && entry?.weight !== undefined);
+  setStatusPill("#weight-status-pill", "体重", hasWeightEntry(entry));
   setStatusPill("#food-status-pill", "食事", entry?.intakeCalories !== null && entry?.intakeCalories !== undefined);
   setStatusPill("#exercise-status-pill", "運動", entry?.burnCalories !== null && entry?.burnCalories !== undefined);
 }
@@ -655,10 +764,11 @@ function setStatusPill(selector, label, isDone) {
 function renderCalorieDashboard(entry) {
   const intake = entry?.intakeCalories ?? null;
   const burn = entry?.burnCalories ?? null;
+  const weight = getPrimaryWeight(entry);
 
   document.querySelector("#intake-calorie-label").textContent = intake === null ? "-- kcal" : `${Math.round(intake)} kcal`;
   document.querySelector("#burn-calorie-label").textContent = burn === null ? "-- kcal" : `${Math.round(burn)} kcal`;
-  document.querySelector("#combo-weight-label").textContent = entry?.weight === null || entry?.weight === undefined ? "-- kg" : `${entry.weight.toFixed(1)} kg`;
+  document.querySelector("#combo-weight-label").textContent = weight === null ? "-- kg" : `${weight.toFixed(1)} kg`;
 
   const balanceLabel = document.querySelector("#calorie-balance-label");
   if (intake === null && burn === null) {
@@ -677,7 +787,7 @@ function renderCalorieComboChart() {
   const svg = document.querySelector("#calorie-combo-chart");
   const empty = document.querySelector("#calorie-chart-empty");
   const rangePoints = entries
-    .filter((item) => item.intakeCalories !== null || item.burnCalories !== null || item.weight !== null)
+    .filter((item) => item.intakeCalories !== null || item.burnCalories !== null || hasWeightEntry(item))
     .filter((item) => isWithinRange(item.date, comboChartRangeDays))
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -697,7 +807,7 @@ function renderCalorieComboChart() {
   const height = 260;
   const pad = { top: 24, right: 58, bottom: 42, left: 58 };
   const calorieValues = points.flatMap((point) => [point.intakeCalories, point.burnCalories]).filter((value) => value !== null);
-  const weightValues = points.map((point) => point.weight).filter((value) => value !== null);
+  const weightValues = points.map(getPrimaryWeight).filter((value) => value !== null);
   const max = calorieValues.length ? Math.max(500, Math.ceil(Math.max(...calorieValues) / 250) * 250) : 500;
   const minWeight = weightValues.length ? Math.floor((Math.min(...weightValues) - 0.5) * 10) / 10 : 0;
   const maxWeight = weightValues.length ? Math.ceil((Math.max(...weightValues) + 0.5) * 10) / 10 : 1;
@@ -722,10 +832,11 @@ function renderCalorieComboChart() {
   let weightIndex = 0;
   const weightLinePoints = points
     .map((point, index) => {
-      if (point.weight === null) return null;
+      const weight = getPrimaryWeight(point);
+      if (weight === null) return null;
       const command = weightIndex === 0 ? "M" : "L";
       weightIndex += 1;
-      return `${command} ${xCenter(index).toFixed(1)} ${yWeight(point.weight).toFixed(1)}`;
+      return `${command} ${xCenter(index).toFixed(1)} ${yWeight(weight).toFixed(1)}`;
     })
     .filter(Boolean)
     .join(" ");
@@ -739,7 +850,10 @@ function renderCalorieComboChart() {
     .map((point, index) => point.intakeCalories === null ? "" : `<circle class="calorie-intake-dot" cx="${xCenter(index).toFixed(1)}" cy="${y(point.intakeCalories).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 摂取 ${Math.round(point.intakeCalories)}kcal</title></circle>`)
     .join("");
   const weightDots = points
-    .map((point, index) => point.weight === null ? "" : `<circle class="combo-weight-dot" cx="${xCenter(index).toFixed(1)}" cy="${yWeight(point.weight).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 体重 ${point.weight.toFixed(1)}kg</title></circle>`)
+    .map((point, index) => {
+      const weight = getPrimaryWeight(point);
+      return weight === null ? "" : `<circle class="combo-weight-dot" cx="${xCenter(index).toFixed(1)}" cy="${yWeight(weight).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 体重 ${weight.toFixed(1)}kg</title></circle>`;
+    })
     .join("");
   const grid = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
     const value = Math.round(max * (1 - ratio));
@@ -786,7 +900,7 @@ function sampleChartPoints(points, maxCount) {
 }
 
 function renderWeeklyAverage(weekEntries) {
-  const weights = weekEntries.filter((entry) => entry.weight !== null).map((entry) => entry.weight);
+  const weights = weekEntries.map(getPrimaryWeight).filter((weight) => weight !== null);
   const average = weights.length ? weights.reduce((sum, weight) => sum + weight, 0) / weights.length : null;
   document.querySelector("#weekly-average").textContent = average === null ? "-- kg" : `${average.toFixed(1)} kg`;
   document.querySelector("#weekly-average-detail").textContent = weights.length
@@ -803,13 +917,14 @@ function renderGoalSummary(latestWithWeight) {
     return;
   }
 
-  const diff = latestWithWeight.weight - profile.goalWeight;
+  const latestWeight = getPrimaryWeight(latestWithWeight);
+  const diff = latestWeight - profile.goalWeight;
   const absolute = Math.abs(diff).toFixed(1);
   remaining.textContent = diff > 0 ? `${absolute} kg` : "達成中";
 
   if (profile.startWeight) {
     const total = Math.abs(profile.startWeight - profile.goalWeight);
-    const done = Math.min(total, Math.max(0, Math.abs(profile.startWeight - latestWithWeight.weight)));
+    const done = Math.min(total, Math.max(0, Math.abs(profile.startWeight - latestWeight)));
     const percent = total ? Math.round((done / total) * 100) : 100;
     const targetDate = getEstimatedTargetDate(profile.startWeight, profile.goalWeight, profile.pace, profile.startDate);
     detail.textContent = targetDate ? `開始から${percent}% / 目安 ${targetDate}` : `開始から${percent}%進行`;
@@ -829,7 +944,7 @@ function renderHistory() {
   historyList.innerHTML = entries
     .slice(0, 14)
     .map((entry) => {
-      const weight = entry.weight === null ? "体重未入力" : `${entry.weight.toFixed(1)}kg`;
+      const weight = getWeightHistoryLabel(entry);
       const sleep = entry.sleep === null ? "睡眠未入力" : `${entry.sleep}時間睡眠`;
       const calories = getCalorieLabel(entry);
       const habits = entry.habits.length ? `${entry.habits.length}個の行動` : "行動チェックなし";
@@ -845,11 +960,23 @@ function renderHistory() {
     .join("");
 }
 
+function getWeightHistoryLabel(entry) {
+  const morning = numberOrNull(entry.weightMorning);
+  const night = numberOrNull(entry.weightNight);
+  if (morning === null && night === null) {
+    const weight = getPrimaryWeight(entry);
+    return weight === null ? "体重未入力" : `${weight.toFixed(1)}kg`;
+  }
+  const morningText = morning === null ? "朝--" : `朝${morning.toFixed(1)}kg`;
+  const nightText = night === null ? "夜--" : `夜${night.toFixed(1)}kg`;
+  return `${morningText} / ${nightText}`;
+}
+
 function renderWeightChart() {
   const svg = document.querySelector("#weight-chart");
   const empty = document.querySelector("#chart-empty");
   const points = entries
-    .filter((entry) => entry.weight !== null)
+    .filter(hasWeightEntry)
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-30);
@@ -867,14 +994,14 @@ function renderWeightChart() {
   const width = 720;
   const height = 280;
   const pad = { top: 22, right: 26, bottom: 42, left: 52 };
-  const weights = points.map((point) => point.weight);
+  const weights = points.map(getPrimaryWeight);
   const min = Math.floor(Math.min(...weights) - 0.5);
   const max = Math.ceil(Math.max(...weights) + 0.5);
   const range = Math.max(1, max - min);
   const xStep = (width - pad.left - pad.right) / Math.max(1, points.length - 1);
   const x = (index) => pad.left + index * xStep;
   const y = (weight) => pad.top + ((max - weight) / range) * (height - pad.top - pad.bottom);
-  const actualPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(point.weight).toFixed(1)}`).join(" ");
+  const actualPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(getPrimaryWeight(point)).toFixed(1)}`).join(" ");
   const averagePoints = points.map((point, index) => ({
     date: point.date,
     weight: averageWeight(points.slice(Math.max(0, index - 6), index + 1)),
@@ -889,7 +1016,10 @@ function renderWeightChart() {
     .filter((value, index, array) => array.indexOf(value) === index)
     .map((index) => `<text class="chart-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${formatShortDate(points[index].date)}</text>`)
     .join("");
-  const dots = points.map((point, index) => `<circle class="chart-dot" cx="${x(index)}" cy="${y(point.weight)}" r="4"><title>${formatDateLabel(point.date)} ${point.weight.toFixed(1)}kg</title></circle>`).join("");
+  const dots = points.map((point, index) => {
+    const weight = getPrimaryWeight(point);
+    return `<circle class="chart-dot" cx="${x(index)}" cy="${y(weight)}" r="4"><title>${formatDateLabel(point.date)} ${weight.toFixed(1)}kg</title></circle>`;
+  }).join("");
 
   svg.insertAdjacentHTML("beforeend", `
     ${grid}
@@ -901,7 +1031,7 @@ function renderWeightChart() {
 }
 
 function averageWeight(items) {
-  return items.reduce((sum, item) => sum + item.weight, 0) / items.length;
+  return items.reduce((sum, item) => sum + getPrimaryWeight(item), 0) / items.length;
 }
 
 function fillFormForDate(date, overwrite = true) {
@@ -910,7 +1040,8 @@ function fillFormForDate(date, overwrite = true) {
 
   form.reset();
   dateInput.value = date;
-  document.querySelector("#weight").value = entry.weight ?? "";
+  document.querySelector("#weight-morning").value = entry.weightMorning ?? (entry.weightNight === null || entry.weightNight === undefined ? entry.weight ?? "" : "");
+  document.querySelector("#weight-night").value = entry.weightNight ?? "";
   document.querySelector("#sleep").value = entry.sleep ?? "";
   document.querySelector("#intake-calories").value = entry.intakeCalories ?? "";
   document.querySelector("#burn-calories").value = entry.burnCalories ?? "";
@@ -964,7 +1095,7 @@ function getStreak() {
 function getWeightTrend(latest, previous) {
   if (!latest) return "記録を始めましょう";
   if (!previous) return `${formatDateLabel(latest.date)}に記録`;
-  const diff = latest.weight - previous.weight;
+  const diff = getPrimaryWeight(latest) - getPrimaryWeight(previous);
   if (Math.abs(diff) < 0.1) return "前回からほぼ変化なし";
   const sign = diff > 0 ? "+" : "";
   return `前回から${sign}${diff.toFixed(1)}kg`;
