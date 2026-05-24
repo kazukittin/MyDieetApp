@@ -288,29 +288,6 @@ h2 {
   line-height: 1.8;
 }
 
-.coach-strip {
-  width: min(520px, 100%);
-  margin-top: 18px;
-  display: grid;
-  gap: 4px;
-  border-left: 4px solid var(--green);
-  border-radius: 0 8px 8px 0;
-  background: rgba(255, 255, 255, 0.76);
-  padding: 13px 14px;
-}
-
-.coach-strip span,
-.coach-card span {
-  color: var(--green);
-  font-size: 0.78rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.coach-strip strong {
-  font-size: 1.08rem;
-}
-
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -685,50 +662,6 @@ legend {
   padding: 8px 12px;
   background: var(--blue-soft);
   color: var(--blue);
-}
-
-.advice-list {
-  display: grid;
-  gap: 10px;
-}
-
-.coach-card {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 12px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--green-soft), #fffdfa);
-  padding: 14px;
-}
-
-.coach-card strong {
-  font-size: 1.18rem;
-}
-
-.advice-item {
-  border-left: 4px solid var(--green);
-  border-radius: 0 8px 8px 0;
-  background: var(--bg-soft);
-  padding: 13px;
-}
-
-.advice-item:nth-child(2) {
-  border-left-color: var(--blue);
-}
-
-.advice-item:nth-child(3) {
-  border-left-color: var(--coral);
-}
-
-.advice-item strong {
-  display: block;
-  margin-bottom: 5px;
-}
-
-.advice-item p {
-  margin-bottom: 0;
-  color: var(--muted);
-  line-height: 1.65;
 }
 
 .progress-block {

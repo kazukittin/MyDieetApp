@@ -501,7 +501,7 @@ function getCloudErrorMessage(error) {
 
 function setSyncState(status, message) {
   if (syncStatus) syncStatus.textContent = status;
-  if (message) document.querySelector("#daily-message").textContent = message;
+  if (message && cloudFeedback) setCloudFeedback("error", message);
 }
 
 async function withCloudBusy(button, busyText, action) {
@@ -670,7 +670,6 @@ function bytesFromBase64(text) {
 
 function render() {
   renderSummary();
-  renderAdvice();
   renderWeightChart();
   renderHistory();
   fillFormForDate(dateInput.value, false);
@@ -699,8 +698,6 @@ function renderSummary() {
   const habitRatio = getHabitRatio(weekEntries);
   document.querySelector("#habit-progress").style.width = `${habitRatio}%`;
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
-  const dailyMessage = getDailyMessage(score, selected);
-  document.querySelector("#daily-message").textContent = dailyMessage;
   renderGoalSummary(latestWithWeight);
 }
 
@@ -804,18 +801,15 @@ function renderWeeklyAverage(weekEntries) {
 function renderGoalSummary(latestWithWeight) {
   const remaining = document.querySelector("#goal-remaining");
   const detail = document.querySelector("#goal-detail");
-  const paceDetail = document.querySelector("#pace-detail");
   if (!profile.goalWeight || !latestWithWeight) {
     remaining.textContent = "-- kg";
     detail.textContent = "初回設定で表示されます";
-    paceDetail.textContent = "無理なく続くペースで";
     return;
   }
 
   const diff = latestWithWeight.weight - profile.goalWeight;
   const absolute = Math.abs(diff).toFixed(1);
   remaining.textContent = diff > 0 ? `${absolute} kg` : "達成中";
-  paceDetail.textContent = getPaceLabel(profile.pace);
 
   if (profile.startWeight) {
     const total = Math.abs(profile.startWeight - profile.goalWeight);
@@ -827,16 +821,6 @@ function renderGoalSummary(latestWithWeight) {
   }
 
   detail.textContent = `目標 ${profile.goalWeight.toFixed(1)}kg`;
-}
-
-function renderAdvice() {
-  const adviceList = document.querySelector("#advice-list");
-  const selected = entries.find((entry) => entry.date === dateInput.value);
-  const items = buildAdvice(selected);
-  renderCoachCard(selected, items);
-  adviceList.innerHTML = items
-    .map((item) => `<div class="advice-item"><strong>${item.title}</strong><p>${item.body}</p></div>`)
-    .join("");
 }
 
 function renderHistory() {
@@ -945,66 +929,6 @@ function fillFormForDate(date, overwrite = true) {
   });
 }
 
-function renderCoachCard(entry, adviceItems) {
-  const tone = document.querySelector("#coach-tone");
-  const focus = document.querySelector("#coach-focus");
-  if (!entry) {
-    tone.textContent = "小さく整える";
-    focus.textContent = "まず今日の状態を一つ残す";
-    return;
-  }
-  const score = scoreEntry(entry);
-  tone.textContent = score >= 80 ? "いい流れ" : score >= 60 ? "土台づくり" : "回復優先";
-  focus.textContent = adviceItems[0]?.title || "今日できたことを見る";
-}
-
-function buildAdvice(entry) {
-  if (!entry) {
-    const starter = [
-      { title: "今日の記録から始める", body: "体重は週平均で見ます。今日は食事・睡眠・行動のどれか一つを残せば十分です。" },
-      { title: "小さく勝つ", body: "水分、たんぱく質、野菜、歩くことのどれか一つで十分です。続く量が正解です。" },
-    ];
-    if (profile.goalWeight) {
-      starter.unshift({ title: "目標ペース", body: `${getPaceLabel(profile.pace)}で見ています。急ぐより、続く体調を優先しましょう。` });
-    }
-    return starter.slice(0, 3);
-  }
-
-  const advice = [];
-  const latestWithWeight = entries.find((item) => item.weight !== null);
-  if (profile.goalWeight && latestWithWeight) {
-    const diff = latestWithWeight.weight - profile.goalWeight;
-    if (diff > 0) {
-      advice.push({ title: "目標は週単位で見る", body: `${getPaceLabel(profile.pace)}。今日の増減より、7日平均と健康行動を見ていきましょう。` });
-    }
-  }
-  if (entry.meal === 1) {
-    advice.push({ title: "食事を立て直す", body: "乱れた日は失敗ではなく情報です。次の食事でたんぱく質か野菜を一つ足しましょう。" });
-  }
-  if ((entry.meals || []).length < 2) {
-    advice.push({ title: "食事ログを軽く残す", body: "朝昼夜を全部詳しく書かなくて大丈夫。まずは食べたタイミングだけ残すと流れが見えます。" });
-  }
-  if (entry.sleep !== null && entry.sleep < 6) {
-    advice.push({ title: "睡眠を優先", body: "睡眠不足の日は食欲が強くなりやすいので、明日は早めに休む作戦がよさそうです。" });
-  }
-  if (!entry.habits.includes("protein")) {
-    advice.push({ title: "たんぱく質を足す", body: "卵、魚、豆腐、鶏肉、ヨーグルトなどを一品足すと満足感が安定しやすいです。" });
-  }
-  if (!entry.habits.includes("walk")) {
-    advice.push({ title: "軽く動く", body: "長い運動でなくて大丈夫。10分歩くだけでも、明日の自分に効いてきます。" });
-  }
-  if (!entry.habits.includes("slow_eating")) {
-    advice.push({ title: "食べ方をゆっくりに", body: "量を減らす前に、よく噛んでゆっくり食べるだけでも満足感を作りやすくなります。" });
-  }
-  if (entry.mood === "stress" || entry.mood === "hungry") {
-    advice.push({ title: "責めない日", body: "ストレスや空腹が強い日は、制限よりも整える日。温かい飲み物や早めの夕食が味方です。" });
-  }
-  if (!advice.length) {
-    advice.push({ title: "いい流れです", body: "食事・睡眠・行動の土台が整っています。この調子で急がず続けましょう。" });
-  }
-  return advice.slice(0, 3);
-}
-
 function scoreEntry(entry) {
   let score = 18;
   score += entry.meal * 10;
@@ -1048,16 +972,6 @@ function getWeightTrend(latest, previous) {
   if (Math.abs(diff) < 0.1) return "前回からほぼ変化なし";
   const sign = diff > 0 ? "+" : "";
   return `前回から${sign}${diff.toFixed(1)}kg`;
-}
-
-function getDailyMessage(score, entry) {
-  if (entry && (entry.meals || []).length === 0) return "食事の流れを一つ残す";
-  if (entry && entry.habits.length === 0) return "小さな健康行動を選ぶ";
-  if (score === null) return "焦らず整える";
-  if (score >= 85) return "かなりいい流れ";
-  if (score >= 70) return "土台が整っている";
-  if (score >= 55) return "できたことを見る";
-  return "回復を優先";
 }
 
 function getMealLogLabel(meals) {
