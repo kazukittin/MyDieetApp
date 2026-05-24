@@ -23,6 +23,7 @@ const loadDemoDataButton = document.querySelector("#load-demo-data");
 const demoFeedback = document.querySelector("#demo-feedback");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
+const rangeButtons = document.querySelectorAll("[data-range-days]");
 const canUseServerSync = isPrivateHost(location.hostname);
 const cloudStorageKey = "my-diet-notebook:cloud:v1";
 const profileStorageKey = "my-diet-notebook:profile:v1";
@@ -33,6 +34,7 @@ const exerciseHabitValues = ["walk", "stretch", "strength"];
 let entries = loadEntries();
 let cloudConfig = loadCloudConfig();
 let profile = loadProfile();
+let comboChartRangeDays = 31;
 
 dateInput.value = isoToday;
 if (document.querySelector("#today-label")) {
@@ -167,6 +169,13 @@ syncNowButton.addEventListener("click", (event) => {
 openSettingsButton.addEventListener("click", openSettings);
 pageButtons.forEach((button) => {
   button.addEventListener("click", () => switchPage(button.dataset.pageTarget));
+});
+rangeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    comboChartRangeDays = Number(button.dataset.rangeDays);
+    rangeButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+    renderCalorieComboChart();
+  });
 });
 closeSettingsButton.addEventListener("click", closeSettings);
 settingsScreen.addEventListener("click", (event) => {
@@ -725,11 +734,12 @@ function renderCalorieDashboard(entry) {
 function renderCalorieComboChart() {
   const svg = document.querySelector("#calorie-combo-chart");
   const empty = document.querySelector("#calorie-chart-empty");
-  const points = entries
+  const rangePoints = entries
     .filter((item) => item.intakeCalories !== null || item.burnCalories !== null || item.weight !== null)
+    .filter((item) => isWithinRange(item.date, comboChartRangeDays))
     .slice()
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-14);
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const points = sampleChartPoints(rangePoints, 120);
 
   svg.innerHTML = '<title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>';
   if (!points.length) {
@@ -799,8 +809,9 @@ function renderCalorieComboChart() {
     const yy = pad.top + innerHeight * ratio;
     return `<text class="chart-label combo-weight-axis" x="${width - 10}" y="${yy + 4}" text-anchor="end">${value.toFixed(1)}kg</text>`;
   }).join("");
+  const labelInterval = Math.max(1, Math.ceil(points.length / 8));
   const labels = points.map((point, index) => {
-    if (points.length > 7 && index % 2 === 1 && index !== points.length - 1) return "";
+    if (points.length > 8 && index !== 0 && index !== points.length - 1 && index % labelInterval !== 0) return "";
     return `<text class="chart-label" x="${xCenter(index).toFixed(1)}" y="${height - 12}" text-anchor="middle">${formatShortDate(point.date)}</text>`;
   }).join("");
 
@@ -814,6 +825,22 @@ function renderCalorieComboChart() {
     ${weightAxis}
     ${labels}
   `);
+}
+
+function isWithinRange(date, days) {
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+  return new Date(`${date}T00:00:00`) >= start;
+}
+
+function sampleChartPoints(points, maxCount) {
+  if (points.length <= maxCount) return points;
+  const lastIndex = points.length - 1;
+  return Array.from({ length: maxCount }, (_, index) => {
+    const pointIndex = Math.round((index * lastIndex) / (maxCount - 1));
+    return points[pointIndex];
+  });
 }
 
 function renderWeeklyAverage(weekEntries) {

@@ -425,6 +425,31 @@ h2 {
   font-size: 1.25rem;
 }
 
+.range-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.range-tabs button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdfa;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 850;
+  padding: 7px 11px;
+}
+
+.range-tabs button:hover,
+.range-tabs button.is-active {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: #1d5a3c;
+}
+
 .calorie-chart-wrap {
   width: 100%;
   overflow-x: auto;

@@ -195,6 +195,14 @@
               <div><span>消費</span><strong id="burn-calorie-label">-- kcal</strong></div>
               <div><span>体重</span><strong id="combo-weight-label">-- kg</strong></div>
             </div>
+            <div class="range-tabs" aria-label="グラフ表示期間">
+              <button type="button" data-range-days="730">2年</button>
+              <button type="button" data-range-days="365">1年</button>
+              <button type="button" data-range-days="183">6か月</button>
+              <button type="button" data-range-days="92">3か月</button>
+              <button type="button" data-range-days="31" class="is-active">1か月</button>
+              <button type="button" data-range-days="7">1週間</button>
+            </div>
             <div class="calorie-chart-wrap">
               <svg id="calorie-combo-chart" class="calorie-combo-chart" viewBox="0 0 720 260" role="img" aria-labelledby="calorie-chart-title">
                 <title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>
