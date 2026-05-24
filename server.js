@@ -134,6 +134,7 @@ function normalizeEntry(entry) {
     weightNight,
     sleep: numberOrNull(entry.sleep),
     intakeCalories: numberOrNull(entry.intakeCalories),
+    mealCalories: normalizeMealCalories(entry.mealCalories),
     burnCalories: numberOrNull(entry.burnCalories),
     exerciseMinutes: numberOrNull(entry.exerciseMinutes),
     exerciseType: typeof entry.exerciseType === "string" ? entry.exerciseType : "",
@@ -145,6 +146,16 @@ function normalizeEntry(entry) {
     mood: typeof entry.mood === "string" ? entry.mood : "calm",
     note: typeof entry.note === "string" ? entry.note : "",
     updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : new Date().toISOString(),
+  };
+}
+
+function normalizeMealCalories(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    breakfast: numberOrNull(source.breakfast),
+    lunch: numberOrNull(source.lunch),
+    dinner: numberOrNull(source.dinner),
+    snack: numberOrNull(source.snack),
   };
 }
 

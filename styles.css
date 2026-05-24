@@ -436,6 +436,23 @@ h2 {
   gap: 8px;
 }
 
+.food-preset-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.meal-calorie-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.meal-total-card {
+  grid-column: 1 / -1;
+  background: var(--green-soft);
+}
+
 .preset-card {
   min-height: 94px;
   display: grid;
@@ -1215,6 +1232,8 @@ legend {
   .exercise-summary-grid,
   .exercise-grid,
   .exercise-preset-list,
+  .food-preset-list,
+  .meal-calorie-grid,
   .food-summary-grid,
   .food-grid,
   .workspace,

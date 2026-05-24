@@ -23,6 +23,7 @@ const loadDemoDataButton = document.querySelector("#load-demo-data");
 const demoFeedback = document.querySelector("#demo-feedback");
 const applyTodayPresetButton = document.querySelector("#apply-today-preset");
 const exercisePresetList = document.querySelector("#exercise-preset-list");
+const foodPresetList = document.querySelector("#food-preset-list");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
@@ -40,6 +41,12 @@ const exercisePresets = [
   { day: "木", type: "abs", minutes: 20, burnCalories: 110, intensity: "light", habits: ["strength", "stretch"], note: "お腹の日。体幹を軽めに。" },
   { day: "金", type: "chest", minutes: 30, burnCalories: 210, intensity: "hard", habits: ["strength"], note: "胸の日。週末前に少ししっかり動く。" },
   { day: "土", type: "walk", minutes: 45, burnCalories: 260, intensity: "normal", habits: ["walk", "stretch"], note: "長めに歩く。終わったらストレッチ。" },
+];
+const foodPresets = [
+  { meal: "breakfast", label: "朝の定番", calories: 420, habits: ["water", "protein"], note: "朝はたんぱく質を入れる。" },
+  { meal: "lunch", label: "昼の定番", calories: 650, habits: ["protein", "vegetables"], note: "昼は主食と野菜を揃える。" },
+  { meal: "dinner", label: "夜の定番", calories: 700, habits: ["vegetables", "slow_eating"], note: "夜はゆっくり食べて整える。" },
+  { meal: "snack", label: "間食控えめ", calories: 150, habits: ["no_snack"], note: "間食は軽めにする。" },
 ];
 
 let entries = loadEntries();
@@ -82,6 +89,7 @@ form.addEventListener("submit", (event) => {
     weightNight: previous?.weightNight ?? null,
     sleep: previous?.sleep ?? null,
     intakeCalories: previous?.intakeCalories ?? null,
+    mealCalories: previous?.mealCalories ?? {},
     burnCalories: previous?.burnCalories ?? null,
     exerciseMinutes: previous?.exerciseMinutes ?? null,
     exerciseType: previous?.exerciseType ?? "",
@@ -106,9 +114,10 @@ form.addEventListener("submit", (event) => {
     const selectedHabits = formData.getAll("habits");
     const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
     const selectedFood = selectedHabits.filter((habit) => foodHabitValues.includes(habit));
-    entry.meal = Number(formData.get("meal") || 2);
-    entry.intakeCalories = numberOrNull(formData.get("intakeCalories"));
+    entry.mealCalories = getMealCaloriesFromForm(formData);
+    entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
     entry.meals = formData.getAll("meals");
+    entry.meal = deriveMealScore(entry.meals, selectedFood);
     entry.habits = [...new Set([...preservedExercise, ...selectedFood])];
     entry.mood = formData.get("mood");
     entry.note = String(formData.get("note") || "").trim();
@@ -144,7 +153,7 @@ clearTodayButton.addEventListener("click", () => {
   saveEntries();
   form.reset();
   dateInput.value = date;
-  document.querySelector('input[name="meal"][value="3"]').checked = true;
+  updateIntakeCaloriesTotal();
   render();
 });
 
@@ -206,6 +215,9 @@ if (applyTodayPresetButton) {
     setSaveFeedback("exercise", "success", "今日の曜日メニューを入力しました。保存すると記録に残ります。");
   });
 }
+document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
+  input.addEventListener("input", updateIntakeCaloriesTotal);
+});
 closeSettingsButton.addEventListener("click", closeSettings);
 settingsScreen.addEventListener("click", (event) => {
   if (event.target === settingsScreen) closeSettings();
@@ -241,6 +253,7 @@ onboardingForm.addEventListener("submit", (event) => {
       weightNight: null,
       sleep: null,
       intakeCalories: null,
+      mealCalories: {},
       burnCalories: null,
       exerciseMinutes: null,
       exerciseType: "",
@@ -630,6 +643,7 @@ function buildDemoData() {
       weight: Number(nightWeight.toFixed(1)),
       sleep: sleepValues[index],
       intakeCalories: intakeValues[index],
+      mealCalories: splitDemoMealCalories(intakeValues[index], index % 4 === 0),
       burnCalories: burnValues[index],
       exerciseMinutes: [25, 35, 15, 40, 30, 55, 25, 30, 45, 20, 50, 35, 45, 40][index],
       exerciseType: ["full_body", "walk", "legs", "back", "abs", "chest", "walk"][date.getDay()],
@@ -658,6 +672,17 @@ function buildDemoData() {
       skipped: false,
       updatedAt: new Date().toISOString(),
     },
+  };
+}
+
+function splitDemoMealCalories(total, hasLightSnack) {
+  const snack = hasLightSnack ? 120 : 180;
+  const remaining = total - snack;
+  return {
+    breakfast: Math.round(remaining * 0.25),
+    lunch: Math.round(remaining * 0.38),
+    dinner: Math.max(0, total - snack - Math.round(remaining * 0.25) - Math.round(remaining * 0.38)),
+    snack,
   };
 }
 
@@ -786,7 +811,7 @@ function renderSummary() {
 
 function renderDailyStatus(entry) {
   setStatusPill("#weight-status-pill", "体重", hasWeightEntry(entry));
-  setStatusPill("#food-status-pill", "食事", entry?.intakeCalories !== null && entry?.intakeCalories !== undefined);
+  setStatusPill("#food-status-pill", "食事", numberOrNull(entry?.intakeCalories) !== null);
   setStatusPill("#exercise-status-pill", "運動", entry?.burnCalories !== null && entry?.burnCalories !== undefined);
 }
 
@@ -823,7 +848,7 @@ function renderCalorieComboChart() {
   const svg = document.querySelector("#calorie-combo-chart");
   const empty = document.querySelector("#calorie-chart-empty");
   const rangePoints = entries
-    .filter((item) => item.intakeCalories !== null || item.burnCalories !== null || hasWeightEntry(item))
+    .filter((item) => numberOrNull(item.intakeCalories) !== null || numberOrNull(item.burnCalories) !== null || hasWeightEntry(item))
     .filter((item) => isWithinRange(item.date, comboChartRangeDays))
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -858,10 +883,11 @@ function renderCalorieComboChart() {
   let intakeIndex = 0;
   const linePoints = points
     .map((point, index) => {
-      if (point.intakeCalories === null) return null;
+      const intake = numberOrNull(point.intakeCalories);
+      if (intake === null) return null;
       const command = intakeIndex === 0 ? "M" : "L";
       intakeIndex += 1;
-      return `${command} ${xCenter(index).toFixed(1)} ${y(point.intakeCalories).toFixed(1)}`;
+      return `${command} ${xCenter(index).toFixed(1)} ${y(intake).toFixed(1)}`;
     })
     .filter(Boolean)
     .join(" ");
@@ -883,7 +909,10 @@ function renderCalorieComboChart() {
     return `<rect class="calorie-burn-bar" x="${x.toFixed(1)}" y="${y(value).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" rx="6"><title>${formatDateLabel(point.date)} 消費 ${Math.round(value)}kcal</title></rect>`;
   }).join("");
   const dots = points
-    .map((point, index) => point.intakeCalories === null ? "" : `<circle class="calorie-intake-dot" cx="${xCenter(index).toFixed(1)}" cy="${y(point.intakeCalories).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 摂取 ${Math.round(point.intakeCalories)}kcal</title></circle>`)
+    .map((point, index) => {
+      const intake = numberOrNull(point.intakeCalories);
+      return intake === null ? "" : `<circle class="calorie-intake-dot" cx="${xCenter(index).toFixed(1)}" cy="${y(intake).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 摂取 ${Math.round(intake)}kcal</title></circle>`;
+    })
     .join("");
   const weightDots = points
     .map((point, index) => {
@@ -1161,17 +1190,18 @@ function getExerciseIntensityLabel(value) {
 function renderFoodPage() {
   const todayEntry = entries.find((entry) => entry.date === dateInput.value);
   const weekEntries = getRecentEntries(7);
-  const calorieEntries = weekEntries.filter((entry) => entry.intakeCalories !== null && entry.intakeCalories !== undefined);
+  const calorieEntries = weekEntries.filter((entry) => numberOrNull(entry.intakeCalories) !== null);
   const averageCalories = calorieEntries.length
-    ? calorieEntries.reduce((sum, entry) => sum + entry.intakeCalories, 0) / calorieEntries.length
+    ? calorieEntries.reduce((sum, entry) => sum + numberOrNull(entry.intakeCalories), 0) / calorieEntries.length
     : null;
   const mealCount = (todayEntry?.meals || []).length;
   const habitCount = getFoodHabits(todayEntry).length;
 
+  renderFoodPresets();
   document.querySelector("#food-today-calories").textContent = todayEntry?.intakeCalories === null || todayEntry?.intakeCalories === undefined
     ? "-- kcal"
     : `${Math.round(todayEntry.intakeCalories)} kcal`;
-  document.querySelector("#food-today-calories-detail").textContent = todayEntry ? getMealQualityLabel(todayEntry.meal) : "入力すると表示";
+  document.querySelector("#food-today-calories-detail").textContent = todayEntry ? "朝・昼・夜・間食の合計" : "入力すると表示";
   document.querySelector("#food-meal-count").textContent = `${mealCount || "--"} / 4`;
   document.querySelector("#food-meal-count-detail").textContent = mealCount ? getMealLogLabel(todayEntry.meals || []) : "朝・昼・夜・間食";
   document.querySelector("#food-habit-count").textContent = `${habitCount || "--"} / ${foodHabitValues.length}`;
@@ -1179,6 +1209,47 @@ function renderFoodPage() {
   document.querySelector("#food-week-average-detail").textContent = calorieEntries.length ? `${calorieEntries.length}日の記録から計算` : "摂取カロリー平均";
 
   renderFoodHistory();
+}
+
+function renderFoodPresets() {
+  if (!foodPresetList) return;
+  foodPresetList.innerHTML = foodPresets
+    .map((preset) => `
+      <button class="preset-card" type="button" data-food-preset="${preset.meal}">
+        <span>${getMealName(preset.meal)}</span>
+        <strong>${preset.label}</strong>
+        <small>${preset.calories}kcal</small>
+      </button>
+    `)
+    .join("");
+
+  foodPresetList.querySelectorAll("[data-food-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = foodPresets.find((item) => item.meal === button.dataset.foodPreset);
+      applyFoodPreset(preset);
+      setSaveFeedback("food", "success", `${preset.label}を入力しました。保存すると記録に残ります。`);
+    });
+  });
+}
+
+function applyFoodPreset(preset) {
+  if (!preset) return;
+  const input = document.querySelector(`#${preset.meal}-calories`);
+  if (input) input.value = preset.calories;
+  const mealCheckbox = document.querySelector(`input[name="meals"][value="${preset.meal}"]`);
+  if (mealCheckbox) mealCheckbox.checked = true;
+  document.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
+    if (foodHabitValues.includes(checkbox.value) && preset.habits.includes(checkbox.value)) checkbox.checked = true;
+  });
+  const note = document.querySelector("#note");
+  if (note && preset.note && !note.value.trim()) note.value = preset.note;
+  updateIntakeCaloriesTotal();
+}
+
+function updateIntakeCaloriesTotal() {
+  const total = getMealCaloriesTotal(getMealCaloriesFromInputs());
+  const totalInput = document.querySelector("#intake-calories");
+  if (totalInput) totalInput.value = total || "";
 }
 
 function renderFoodHistory() {
@@ -1195,9 +1266,9 @@ function renderFoodHistory() {
       <article class="food-history-item">
         <div>
           <strong>${formatDateLabel(entry.date)}</strong>
-          <span>${getCalorieLabel(entry)} / ${getMealQualityLabel(entry.meal)}</span>
+          <span>${getCalorieLabel(entry)}</span>
         </div>
-        <div>${getMealLogLabel(entry.meals || [])}</div>
+        <div>${getMealLogLabel(entry.meals || [])} / ${getMealCaloriesLabel(entry)}</div>
         <div>${getFoodHabits(entry).map(getFoodHabitLabel).join("・") || "健康チェックなし"}</div>
       </article>
     `)
@@ -1206,7 +1277,7 @@ function renderFoodHistory() {
 
 function hasFoodEntry(entry) {
   return Boolean(entry && (
-    entry.intakeCalories !== null
+    numberOrNull(entry.intakeCalories) !== null
     || (entry.meals || []).length
     || getFoodHabits(entry).length
     || entry.note
@@ -1215,6 +1286,53 @@ function hasFoodEntry(entry) {
 
 function getFoodHabits(entry) {
   return (entry?.habits || []).filter((habit) => foodHabitValues.includes(habit));
+}
+
+function getMealCaloriesFromForm(formData) {
+  return {
+    breakfast: numberOrNull(formData.get("breakfastCalories")),
+    lunch: numberOrNull(formData.get("lunchCalories")),
+    dinner: numberOrNull(formData.get("dinnerCalories")),
+    snack: numberOrNull(formData.get("snackCalories")),
+  };
+}
+
+function getMealCaloriesFromInputs() {
+  return {
+    breakfast: numberOrNull(document.querySelector("#breakfast-calories")?.value),
+    lunch: numberOrNull(document.querySelector("#lunch-calories")?.value),
+    dinner: numberOrNull(document.querySelector("#dinner-calories")?.value),
+    snack: numberOrNull(document.querySelector("#snack-calories")?.value),
+  };
+}
+
+function getMealCaloriesTotal(mealCalories = {}) {
+  const values = Object.values(mealCalories).map(numberOrNull).filter((value) => value !== null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+}
+
+function getMealCaloriesLabel(entry) {
+  const mealCalories = entry.mealCalories || {};
+  const labels = ["breakfast", "lunch", "dinner", "snack"]
+    .map((meal) => {
+      const value = numberOrNull(mealCalories[meal]);
+      return value === null ? "" : `${getMealName(meal)}${Math.round(value)}kcal`;
+    })
+    .filter(Boolean);
+  return labels.length ? labels.join(" / ") : "内訳なし";
+}
+
+function deriveMealScore(meals, foodHabits) {
+  const mealCount = meals.length;
+  const habitCount = foodHabits.length;
+  if (mealCount >= 3 && habitCount >= 3) return 3;
+  if (mealCount >= 2 || habitCount >= 2) return 2;
+  return 1;
+}
+
+function getMealName(value) {
+  const labels = { breakfast: "朝", lunch: "昼", dinner: "夜", snack: "間食" };
+  return labels[value] || value;
 }
 
 function getFoodHabitLabel(value) {
@@ -1226,11 +1344,6 @@ function getFoodHabitLabel(value) {
     slow_eating: "ゆっくり",
   };
   return labels[value] || value;
-}
-
-function getMealQualityLabel(value) {
-  const labels = { 1: "乱れた", 2: "ふつう", 3: "整った" };
-  return labels[value] || "未評価";
 }
 
 function setWeightMetric(valueSelector, detailSelector, value, detail) {
@@ -1365,6 +1478,11 @@ function fillFormForDate(date, overwrite = true) {
   document.querySelector("#weight-morning").value = entry.weightMorning ?? (entry.weightNight === null || entry.weightNight === undefined ? entry.weight ?? "" : "");
   document.querySelector("#weight-night").value = entry.weightNight ?? "";
   document.querySelector("#sleep").value = entry.sleep ?? "";
+  const mealCalories = entry.mealCalories || {};
+  document.querySelector("#breakfast-calories").value = mealCalories.breakfast ?? "";
+  document.querySelector("#lunch-calories").value = mealCalories.lunch ?? "";
+  document.querySelector("#dinner-calories").value = mealCalories.dinner ?? "";
+  document.querySelector("#snack-calories").value = mealCalories.snack ?? "";
   document.querySelector("#intake-calories").value = entry.intakeCalories ?? "";
   document.querySelector("#burn-calories").value = entry.burnCalories ?? "";
   document.querySelector("#exercise-minutes").value = entry.exerciseMinutes ?? "";
@@ -1373,7 +1491,6 @@ function fillFormForDate(date, overwrite = true) {
   const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${intensity}"]`);
   if (intensityInput) intensityInput.checked = true;
   document.querySelector("#exercise-note").value = entry.exerciseNote ?? "";
-  document.querySelector(`input[name="meal"][value="${entry.meal}"]`).checked = true;
   document.querySelector("#mood").value = entry.mood;
   document.querySelector("#note").value = entry.note;
   document.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
@@ -1386,8 +1503,7 @@ function fillFormForDate(date, overwrite = true) {
 
 function scoreEntry(entry) {
   let score = 18;
-  score += entry.meal * 10;
-  score += Math.min((entry.meals || []).length, 4) * 3;
+  score += Math.min((entry.meals || []).length, 4) * 8;
   score += Math.min(entry.habits.length, 8) * 4;
   if (entry.sleep !== null) {
     score += entry.sleep >= 7 ? 20 : entry.sleep >= 6 ? 12 : 5;
