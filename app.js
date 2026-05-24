@@ -19,8 +19,6 @@ const openSettingsButton = document.querySelector("#open-settings");
 const closeSettingsButton = document.querySelector("#close-settings");
 const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
-const loadDemoDataButton = document.querySelector("#load-demo-data");
-const demoFeedback = document.querySelector("#demo-feedback");
 const applyTodayPresetButton = document.querySelector("#apply-today-preset");
 const exercisePresetList = document.querySelector("#exercise-preset-list");
 const foodPresetList = document.querySelector("#food-preset-list");
@@ -304,21 +302,6 @@ profileForm.addEventListener("submit", (event) => {
       setProfileFeedback("error", getCloudErrorMessage(error));
     });
   }
-});
-
-loadDemoDataButton.addEventListener("click", () => {
-  const shouldLoad = confirm("現在の端末内データをデモデータに置き換えます。クラウドには同期しません。");
-  if (!shouldLoad) return;
-  const demo = buildDemoData();
-  entries = demo.entries;
-  profile = demo.profile;
-  localStorage.setItem(storageKey, JSON.stringify(entries));
-  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
-  fillProfileForm();
-  fillFormForDate(isoToday);
-  render();
-  setDemoFeedback("success", "朝・夜の体重入りデモデータを入れました。");
-  switchPage("dashboard");
 });
 
 function loadEntries() {
@@ -608,82 +591,6 @@ function setCloudFeedback(type, message) {
 function setProfileFeedback(type, message) {
   profileFeedback.textContent = message;
   profileFeedback.className = `cloud-feedback is-${type}`;
-}
-
-function setDemoFeedback(type, message) {
-  demoFeedback.textContent = message;
-  demoFeedback.className = `cloud-feedback is-${type}`;
-}
-
-function buildDemoData() {
-  const demoEntries = [];
-  const baseWeight = 72.4;
-  const start = new Date(today);
-  start.setDate(start.getDate() - 13);
-  const intakeValues = [2050, 1980, 2140, 1900, 2020, 1850, 1970, 1930, 1880, 1990, 1820, 1900, 1760, 1840];
-  const burnValues = [260, 340, 220, 410, 300, 520, 280, 360, 430, 310, 540, 380, 460, 420];
-  const sleepValues = [6.5, 7, 6, 7.5, 6.5, 8, 7, 6, 7.5, 6.5, 7, 8, 7.5, 7];
-  const moods = ["calm", "good", "tired", "calm", "good", "good", "calm", "stress", "calm", "good", "good", "calm", "good", "calm"];
-
-  for (let index = 0; index < 14; index += 1) {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
-    const morningWeight = baseWeight - index * 0.13 + (index % 3 === 0 ? 0.15 : index % 4 === 0 ? -0.08 : 0);
-    const nightWeight = morningWeight + 0.35 + (index % 4 === 0 ? 0.1 : 0);
-    const habits = ["water", "protein", "vegetables"];
-    if (index % 2 === 0) habits.push("walk");
-    if (index % 3 !== 0) habits.push("no_snack");
-    if (index % 4 !== 0) habits.push("slow_eating");
-    if (index % 5 === 0) habits.push("stretch");
-
-    demoEntries.push({
-      date: toIsoDate(date),
-      weightMorning: Number(morningWeight.toFixed(1)),
-      weightNight: Number(nightWeight.toFixed(1)),
-      weight: Number(nightWeight.toFixed(1)),
-      sleep: sleepValues[index],
-      intakeCalories: intakeValues[index],
-      mealCalories: splitDemoMealCalories(intakeValues[index], index % 4 === 0),
-      burnCalories: burnValues[index],
-      exerciseMinutes: [25, 35, 15, 40, 30, 55, 25, 30, 45, 20, 50, 35, 45, 40][index],
-      exerciseType: ["full_body", "walk", "legs", "back", "abs", "chest", "walk"][date.getDay()],
-      exerciseIntensity: index % 5 === 0 ? "light" : index % 3 === 0 ? "hard" : "normal",
-      exerciseNote: index === 13 ? "夕方にウォーキング。少し汗をかけた。" : "",
-      meal: index % 5 === 0 ? 2 : 3,
-      meals: index % 4 === 0 ? ["breakfast", "lunch", "dinner"] : ["breakfast", "lunch", "dinner", "snack"],
-      habits,
-      mood: moods[index],
-      note: index === 13 ? "デモ: 朝と夜の体重差を見ながら整える。" : "",
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  const sortedEntries = demoEntries.sort((a, b) => b.date.localeCompare(a.date));
-
-  return {
-    entries: sortedEntries,
-    profile: {
-      startDate: sortedEntries[sortedEntries.length - 1].date,
-      startWeight: 72.4,
-      goalWeight: 68,
-      height: 170,
-      pace: "steady",
-      note: "デモ: 朝体重を基準に、夜体重も記録する",
-      skipped: false,
-      updatedAt: new Date().toISOString(),
-    },
-  };
-}
-
-function splitDemoMealCalories(total, hasLightSnack) {
-  const snack = hasLightSnack ? 120 : 180;
-  const remaining = total - snack;
-  return {
-    breakfast: Math.round(remaining * 0.25),
-    lunch: Math.round(remaining * 0.38),
-    dinner: Math.max(0, total - snack - Math.round(remaining * 0.25) - Math.round(remaining * 0.38)),
-    snack,
-  };
 }
 
 function setSaveFeedback(scope, type, message) {
