@@ -33,12 +33,12 @@ const cloudTable = "diet_app_sync";
 const foodHabitValues = ["water", "protein", "vegetables", "no_snack", "slow_eating"];
 const exerciseHabitValues = ["walk", "stretch", "strength"];
 const exercisePresets = [
-  { day: "日", type: "stretch", minutes: 20, burnCalories: 90, intensity: "light", habits: ["stretch"], note: "回復日。ストレッチで体を整える。" },
+  { day: "日", type: "full_body", minutes: 20, burnCalories: 90, intensity: "light", habits: ["stretch"], note: "回復日。全身を軽く動かして整える。" },
   { day: "月", type: "walk", minutes: 30, burnCalories: 160, intensity: "normal", habits: ["walk"], note: "軽く歩いて週を始める。" },
-  { day: "火", type: "strength", minutes: 25, burnCalories: 180, intensity: "normal", habits: ["strength"], note: "下半身と体幹を中心に。" },
-  { day: "水", type: "bike", minutes: 35, burnCalories: 230, intensity: "normal", habits: ["walk"], note: "有酸素の日。無理なく汗をかく。" },
-  { day: "木", type: "stretch", minutes: 20, burnCalories: 80, intensity: "light", habits: ["stretch"], note: "肩まわりと股関節をほぐす。" },
-  { day: "金", type: "strength", minutes: 30, burnCalories: 210, intensity: "hard", habits: ["strength"], note: "週末前に少ししっかり動く。" },
+  { day: "火", type: "legs", minutes: 25, burnCalories: 180, intensity: "normal", habits: ["strength"], note: "脚の日。スクワットや下半身を中心に。" },
+  { day: "水", type: "back", minutes: 30, burnCalories: 190, intensity: "normal", habits: ["strength"], note: "背中の日。姿勢を意識して動く。" },
+  { day: "木", type: "abs", minutes: 20, burnCalories: 110, intensity: "light", habits: ["strength", "stretch"], note: "お腹の日。体幹を軽めに。" },
+  { day: "金", type: "chest", minutes: 30, burnCalories: 210, intensity: "hard", habits: ["strength"], note: "胸の日。週末前に少ししっかり動く。" },
   { day: "土", type: "walk", minutes: 45, burnCalories: 260, intensity: "normal", habits: ["walk", "stretch"], note: "長めに歩く。終わったらストレッチ。" },
 ];
 
@@ -632,7 +632,7 @@ function buildDemoData() {
       intakeCalories: intakeValues[index],
       burnCalories: burnValues[index],
       exerciseMinutes: [25, 35, 15, 40, 30, 55, 25, 30, 45, 20, 50, 35, 45, 40][index],
-      exerciseType: index % 5 === 0 ? "stretch" : index % 4 === 0 ? "strength" : index % 3 === 0 ? "bike" : "walk",
+      exerciseType: ["full_body", "walk", "legs", "back", "abs", "chest", "walk"][date.getDay()],
       exerciseIntensity: index % 5 === 0 ? "light" : index % 3 === 0 ? "hard" : "normal",
       exerciseNote: index === 13 ? "夕方にウォーキング。少し汗をかけた。" : "",
       meal: index % 5 === 0 ? 2 : 3,
@@ -1072,13 +1072,20 @@ function applyExercisePreset(preset) {
   if (!preset) return;
   document.querySelector("#exercise-minutes").value = preset.minutes;
   document.querySelector("#burn-calories").value = preset.burnCalories;
-  document.querySelector("#exercise-type").value = preset.type;
+  setExerciseTypeValue(preset.type);
   const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${preset.intensity}"]`);
   if (intensityInput) intensityInput.checked = true;
   document.querySelector("#exercise-note").value = preset.note;
   document.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
     if (exerciseHabitValues.includes(checkbox.value)) checkbox.checked = preset.habits.includes(checkbox.value);
   });
+}
+
+function setExerciseTypeValue(value) {
+  const select = document.querySelector("#exercise-type");
+  if (!select) return;
+  const option = Array.from(select.options).find((item) => item.value === value);
+  select.value = option ? value : "";
 }
 
 function getPresetForDate(date) {
@@ -1130,10 +1137,16 @@ function getExerciseDetailLabel(entry) {
 function getExerciseTypeLabel(value) {
   const labels = {
     walk: "ウォーキング",
-    run: "ランニング",
-    bike: "自転車",
-    strength: "筋トレ",
-    stretch: "ストレッチ",
+    chest: "胸",
+    back: "背中",
+    shoulders: "肩",
+    arms: "腕",
+    abs: "お腹",
+    legs: "脚",
+    hips: "お尻",
+    full_body: "全身",
+    strength: "全身",
+    stretch: "全身",
     other: "その他",
   };
   return labels[value] || "運動";
@@ -1279,7 +1292,7 @@ function fillFormForDate(date, overwrite = true) {
   document.querySelector("#intake-calories").value = entry.intakeCalories ?? "";
   document.querySelector("#burn-calories").value = entry.burnCalories ?? "";
   document.querySelector("#exercise-minutes").value = entry.exerciseMinutes ?? "";
-  document.querySelector("#exercise-type").value = entry.exerciseType ?? "";
+  setExerciseTypeValue(entry.exerciseType ?? "");
   const intensity = entry.exerciseIntensity || "normal";
   const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${intensity}"]`);
   if (intensityInput) intensityInput.checked = true;
