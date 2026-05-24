@@ -407,6 +407,59 @@ h2 {
   margin-top: 0;
 }
 
+.preset-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.exercise-preset-list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preset-card {
+  min-height: 94px;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 10px;
+  text-align: left;
+}
+
+.preset-card span {
+  width: fit-content;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 3px 7px;
+}
+
+.preset-card strong {
+  font-size: 0.95rem;
+}
+
+.preset-card small {
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.preset-card:hover,
+.preset-card.is-today {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
 .metric {
   min-height: 118px;
   padding: 16px;
@@ -1115,9 +1168,15 @@ legend {
   .weight-detail-grid,
   .exercise-summary-grid,
   .exercise-grid,
+  .exercise-preset-list,
   .workspace,
   .field-row {
     grid-template-columns: 1fr;
+  }
+
+  .preset-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .summary-grid {

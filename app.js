@@ -21,6 +21,8 @@ const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
 const loadDemoDataButton = document.querySelector("#load-demo-data");
 const demoFeedback = document.querySelector("#demo-feedback");
+const applyTodayPresetButton = document.querySelector("#apply-today-preset");
+const exercisePresetList = document.querySelector("#exercise-preset-list");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
@@ -30,6 +32,15 @@ const profileStorageKey = "my-diet-notebook:profile:v1";
 const cloudTable = "diet_app_sync";
 const foodHabitValues = ["water", "protein", "vegetables", "no_snack", "slow_eating"];
 const exerciseHabitValues = ["walk", "stretch", "strength"];
+const exercisePresets = [
+  { day: "日", type: "stretch", minutes: 20, burnCalories: 90, intensity: "light", habits: ["stretch"], note: "回復日。ストレッチで体を整える。" },
+  { day: "月", type: "walk", minutes: 30, burnCalories: 160, intensity: "normal", habits: ["walk"], note: "軽く歩いて週を始める。" },
+  { day: "火", type: "strength", minutes: 25, burnCalories: 180, intensity: "normal", habits: ["strength"], note: "下半身と体幹を中心に。" },
+  { day: "水", type: "bike", minutes: 35, burnCalories: 230, intensity: "normal", habits: ["walk"], note: "有酸素の日。無理なく汗をかく。" },
+  { day: "木", type: "stretch", minutes: 20, burnCalories: 80, intensity: "light", habits: ["stretch"], note: "肩まわりと股関節をほぐす。" },
+  { day: "金", type: "strength", minutes: 30, burnCalories: 210, intensity: "hard", habits: ["strength"], note: "週末前に少ししっかり動く。" },
+  { day: "土", type: "walk", minutes: 45, burnCalories: 260, intensity: "normal", habits: ["walk", "stretch"], note: "長めに歩く。終わったらストレッチ。" },
+];
 
 let entries = loadEntries();
 let cloudConfig = loadCloudConfig();
@@ -189,6 +200,12 @@ rangeButtons.forEach((button) => {
     renderCalorieComboChart();
   });
 });
+if (applyTodayPresetButton) {
+  applyTodayPresetButton.addEventListener("click", () => {
+    applyExercisePreset(getPresetForDate(dateInput.value || isoToday));
+    setSaveFeedback("exercise", "success", "今日の曜日メニューを入力しました。保存すると記録に残ります。");
+  });
+}
 closeSettingsButton.addEventListener("click", closeSettings);
 settingsScreen.addEventListener("click", (event) => {
   if (event.target === settingsScreen) closeSettings();
@@ -1012,6 +1029,7 @@ function renderExercisePage() {
   const totalBurn = exerciseEntries.reduce((sum, entry) => sum + (entry.burnCalories || 0), 0);
   const todayEntry = entries.find((entry) => entry.date === dateInput.value);
 
+  renderExercisePresets();
   document.querySelector("#exercise-week-minutes").textContent = totalMinutes ? `${Math.round(totalMinutes)} 分` : "-- 分";
   document.querySelector("#exercise-week-minutes-detail").textContent = exerciseEntries.length ? `${exerciseEntries.length}日の記録から計算` : "時間を入れると表示";
   document.querySelector("#exercise-week-burn").textContent = totalBurn ? `${Math.round(totalBurn)} kcal` : "-- kcal";
@@ -1027,6 +1045,44 @@ function renderExercisePage() {
   }
 
   renderExerciseHistory();
+}
+
+function renderExercisePresets() {
+  if (!exercisePresetList) return;
+  const selectedDay = new Date(`${dateInput.value || isoToday}T00:00:00`).getDay();
+  exercisePresetList.innerHTML = exercisePresets
+    .map((preset, index) => `
+      <button class="preset-card ${index === selectedDay ? "is-today" : ""}" type="button" data-preset-day="${index}">
+        <span>${preset.day}</span>
+        <strong>${getExerciseTypeLabel(preset.type)}</strong>
+        <small>${preset.minutes}分 / ${preset.burnCalories}kcal / ${getExerciseIntensityLabel(preset.intensity)}</small>
+      </button>
+    `)
+    .join("");
+
+  exercisePresetList.querySelectorAll("[data-preset-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyExercisePreset(exercisePresets[Number(button.dataset.presetDay)]);
+      setSaveFeedback("exercise", "success", `${button.querySelector("span").textContent}曜メニューを入力しました。`);
+    });
+  });
+}
+
+function applyExercisePreset(preset) {
+  if (!preset) return;
+  document.querySelector("#exercise-minutes").value = preset.minutes;
+  document.querySelector("#burn-calories").value = preset.burnCalories;
+  document.querySelector("#exercise-type").value = preset.type;
+  const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${preset.intensity}"]`);
+  if (intensityInput) intensityInput.checked = true;
+  document.querySelector("#exercise-note").value = preset.note;
+  document.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
+    if (exerciseHabitValues.includes(checkbox.value)) checkbox.checked = preset.habits.includes(checkbox.value);
+  });
+}
+
+function getPresetForDate(date) {
+  return exercisePresets[new Date(`${date}T00:00:00`).getDay()];
 }
 
 function renderExerciseHistory() {
