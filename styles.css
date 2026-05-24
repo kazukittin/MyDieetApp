@@ -389,9 +389,23 @@ h2 {
   margin: 18px 0;
 }
 
+.food-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
 .exercise-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(320px, 0.62fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.food-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.68fr);
   gap: 18px;
   align-items: start;
 }
@@ -403,7 +417,9 @@ h2 {
 }
 
 .exercise-log-panel,
-.exercise-history-panel {
+.exercise-history-panel,
+.food-log-panel,
+.food-history-panel {
   margin-top: 0;
 }
 
@@ -1137,6 +1153,36 @@ legend {
   font-weight: 750;
 }
 
+.food-history-list {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.food-history-item {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 12px 0 0;
+}
+
+.food-history-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.food-history-item strong {
+  display: block;
+}
+
+.food-history-item span,
+.food-history-item div:not(:first-child) {
+  color: var(--muted);
+  font-weight: 750;
+}
+
 .score-pill {
   border-radius: 999px;
   padding: 7px 10px;
@@ -1169,6 +1215,8 @@ legend {
   .exercise-summary-grid,
   .exercise-grid,
   .exercise-preset-list,
+  .food-summary-grid,
+  .food-grid,
   .workspace,
   .field-row {
     grid-template-columns: 1fr;
@@ -1188,6 +1236,7 @@ legend {
   }
 
   .exercise-summary-grid,
+  .food-summary-grid,
   .exercise-input-grid {
     grid-template-columns: 1fr;
   }
@@ -1268,6 +1317,10 @@ legend {
   }
 
   .exercise-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .food-summary-grid {
     grid-template-columns: 1fr;
   }
 

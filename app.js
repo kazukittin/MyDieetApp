@@ -750,6 +750,7 @@ function render() {
   renderSummary();
   renderWeightPageSummary();
   renderExercisePage();
+  renderFoodPage();
   renderWeightChart();
   renderHistory();
   fillFormForDate(dateInput.value, false);
@@ -1155,6 +1156,81 @@ function getExerciseTypeLabel(value) {
 function getExerciseIntensityLabel(value) {
   const labels = { light: "軽め", normal: "普通", hard: "きつめ" };
   return labels[value] || "普通";
+}
+
+function renderFoodPage() {
+  const todayEntry = entries.find((entry) => entry.date === dateInput.value);
+  const weekEntries = getRecentEntries(7);
+  const calorieEntries = weekEntries.filter((entry) => entry.intakeCalories !== null && entry.intakeCalories !== undefined);
+  const averageCalories = calorieEntries.length
+    ? calorieEntries.reduce((sum, entry) => sum + entry.intakeCalories, 0) / calorieEntries.length
+    : null;
+  const mealCount = (todayEntry?.meals || []).length;
+  const habitCount = getFoodHabits(todayEntry).length;
+
+  document.querySelector("#food-today-calories").textContent = todayEntry?.intakeCalories === null || todayEntry?.intakeCalories === undefined
+    ? "-- kcal"
+    : `${Math.round(todayEntry.intakeCalories)} kcal`;
+  document.querySelector("#food-today-calories-detail").textContent = todayEntry ? getMealQualityLabel(todayEntry.meal) : "入力すると表示";
+  document.querySelector("#food-meal-count").textContent = `${mealCount || "--"} / 4`;
+  document.querySelector("#food-meal-count-detail").textContent = mealCount ? getMealLogLabel(todayEntry.meals || []) : "朝・昼・夜・間食";
+  document.querySelector("#food-habit-count").textContent = `${habitCount || "--"} / ${foodHabitValues.length}`;
+  document.querySelector("#food-week-average").textContent = averageCalories === null ? "-- kcal" : `${Math.round(averageCalories)} kcal`;
+  document.querySelector("#food-week-average-detail").textContent = calorieEntries.length ? `${calorieEntries.length}日の記録から計算` : "摂取カロリー平均";
+
+  renderFoodHistory();
+}
+
+function renderFoodHistory() {
+  const list = document.querySelector("#food-history-list");
+  if (!list) return;
+  const foodEntries = entries.filter(hasFoodEntry).slice(0, 14);
+  if (!foodEntries.length) {
+    list.innerHTML = '<p class="empty">まだ食事記録がありません。まずは今日の食事をひとつ残してみましょう。</p>';
+    return;
+  }
+
+  list.innerHTML = foodEntries
+    .map((entry) => `
+      <article class="food-history-item">
+        <div>
+          <strong>${formatDateLabel(entry.date)}</strong>
+          <span>${getCalorieLabel(entry)} / ${getMealQualityLabel(entry.meal)}</span>
+        </div>
+        <div>${getMealLogLabel(entry.meals || [])}</div>
+        <div>${getFoodHabits(entry).map(getFoodHabitLabel).join("・") || "健康チェックなし"}</div>
+      </article>
+    `)
+    .join("");
+}
+
+function hasFoodEntry(entry) {
+  return Boolean(entry && (
+    entry.intakeCalories !== null
+    || (entry.meals || []).length
+    || getFoodHabits(entry).length
+    || entry.note
+  ));
+}
+
+function getFoodHabits(entry) {
+  return (entry?.habits || []).filter((habit) => foodHabitValues.includes(habit));
+}
+
+function getFoodHabitLabel(value) {
+  const labels = {
+    water: "水分",
+    protein: "たんぱく質",
+    vegetables: "野菜・海藻",
+    no_snack: "間食控えめ",
+    slow_eating: "ゆっくり",
+  };
+  return labels[value] || value;
+}
+
+function getMealQualityLabel(value) {
+  const labels = { 1: "乱れた", 2: "ふつう", 3: "整った" };
+  return labels[value] || "未評価";
 }
 
 function setWeightMetric(valueSelector, detailSelector, value, detail) {
