@@ -205,6 +205,11 @@
                 <button type="button" data-range-days="31" class="is-active">1か月</button>
                 <button type="button" data-range-days="7">1週間</button>
               </div>
+              <div class="chart-legend calorie-chart-legend" aria-label="カロリーバランスグラフの説明">
+                <span class="legend-item"><i class="legend-intake"></i>摂取カロリー</span>
+                <span class="legend-item"><i class="legend-burn"></i>消費カロリー</span>
+                <span class="legend-item"><i class="legend-weight"></i>体重</span>
+              </div>
               <div class="calorie-chart-wrap">
                 <svg id="calorie-combo-chart" class="calorie-combo-chart" viewBox="0 0 720 260" role="img" aria-labelledby="calorie-chart-title">
                   <title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>
@@ -259,31 +264,31 @@
             <span>日々の増減より流れを見る</span>
           </div>
 
-          <section class="weight-summary-grid" aria-label="体重推移の概要">
-            <article class="metric">
-              <span>最新の朝体重</span>
-              <strong id="weight-morning-latest">-- kg</strong>
-              <small id="weight-morning-detail">朝の記録で表示</small>
-            </article>
-            <article class="metric">
-              <span>最新の夜体重</span>
-              <strong id="weight-night-latest">-- kg</strong>
-              <small id="weight-night-detail">夜の記録で表示</small>
-            </article>
-            <article class="metric">
-              <span>朝夜差</span>
-              <strong id="weight-day-gap">-- kg</strong>
-              <small id="weight-day-gap-detail">同じ日の朝夜で計算</small>
-            </article>
-            <article class="metric">
-              <span>30日変化</span>
-              <strong id="weight-month-change">-- kg</strong>
-              <small id="weight-month-change-detail">代表体重で計算</small>
-            </article>
-          </section>
+          <div class="weight-top-grid">
+            <section class="weight-summary-grid" aria-label="体重推移の概要">
+              <article class="metric">
+                <span>最新の朝体重</span>
+                <strong id="weight-morning-latest">-- kg</strong>
+                <small id="weight-morning-detail">朝の記録で表示</small>
+              </article>
+              <article class="metric">
+                <span>最新の夜体重</span>
+                <strong id="weight-night-latest">-- kg</strong>
+                <small id="weight-night-detail">夜の記録で表示</small>
+              </article>
+              <article class="metric">
+                <span>朝夜差</span>
+                <strong id="weight-day-gap">-- kg</strong>
+                <small id="weight-day-gap-detail">同じ日の朝夜で計算</small>
+              </article>
+              <article class="metric">
+                <span>30日変化</span>
+                <strong id="weight-month-change">-- kg</strong>
+                <small id="weight-month-change-detail">代表体重で計算</small>
+              </article>
+            </section>
 
-          <section class="workspace single-column">
-            <section class="panel">
+            <section class="panel weight-log-panel">
               <div class="panel-heading">
                 <div>
                   <p class="section-kicker">Weight log</p>
@@ -308,7 +313,9 @@
               <button class="primary-button" type="submit" data-save-scope="weight">体重を保存</button>
               <p id="weight-save-feedback" class="save-feedback" role="status" aria-live="polite">朝か夜の体重を入力して保存できます。</p>
             </section>
+          </div>
 
+          <section class="weight-detail-grid">
             <section class="panel chart-panel">
               <div class="panel-heading">
                 <div>

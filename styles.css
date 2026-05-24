@@ -363,14 +363,34 @@ h2 {
 
 .weight-summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.weight-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.7fr);
+  gap: 18px;
+  align-items: stretch;
   margin-bottom: 18px;
 }
 
+.weight-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.72fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.weight-log-panel,
+.chart-panel,
+.history-panel {
+  margin-top: 0;
+}
+
 .metric {
-  min-height: 138px;
-  padding: 18px;
+  min-height: 118px;
+  padding: 16px;
   display: grid;
   align-content: space-between;
   gap: 8px;
@@ -470,6 +490,23 @@ h2 {
   color: #1d5a3c;
 }
 
+.calorie-chart-legend {
+  margin: 0 0 8px;
+}
+
+.legend-intake {
+  background: var(--coral);
+}
+
+.legend-burn {
+  height: 12px;
+  background: var(--green);
+}
+
+.legend-weight {
+  background: var(--blue);
+}
+
 .calorie-chart-wrap {
   width: 100%;
   overflow-x: auto;
@@ -565,7 +602,7 @@ form {
 }
 
 .weight-log-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 label {
@@ -860,14 +897,6 @@ legend {
   opacity: 0.72;
 }
 
-.history-panel {
-  margin-top: 18px;
-}
-
-.chart-panel {
-  margin-top: 18px;
-}
-
 .chart-legend {
   display: inline-flex;
   flex-wrap: wrap;
@@ -975,11 +1004,14 @@ legend {
 .history-list {
   display: grid;
   gap: 10px;
+  max-height: 330px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .history-item {
   display: grid;
-  grid-template-columns: 118px 1fr auto;
+  grid-template-columns: 96px 1fr auto;
   gap: 12px;
   align-items: center;
   border-top: 1px solid var(--line);
@@ -1026,6 +1058,8 @@ legend {
 
   .hero,
   .dashboard-grid,
+  .weight-top-grid,
+  .weight-detail-grid,
   .workspace,
   .field-row {
     grid-template-columns: 1fr;
@@ -1035,9 +1069,8 @@ legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .weight-summary-grid,
-  .weight-log-grid {
-    grid-template-columns: 1fr;
+  .weight-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .hero-copy {
