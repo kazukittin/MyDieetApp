@@ -1,5 +1,6 @@
 const storageKey = "my-diet-notebook:v1";
-const today = new Date();
+const recordDayBoundaryHour = 3;
+const today = getRecordDayDate(new Date());
 const isoToday = toIsoDate(today);
 
 const form = document.querySelector("#entry-form");
@@ -1528,6 +1529,12 @@ function toIsoDate(date) {
   const offset = date.getTimezoneOffset();
   const local = new Date(date.getTime() - offset * 60 * 1000);
   return local.toISOString().slice(0, 10);
+}
+
+function getRecordDayDate(date) {
+  const adjusted = new Date(date);
+  adjusted.setHours(adjusted.getHours() - recordDayBoundaryHour);
+  return adjusted;
 }
 
 function formatDateLabel(date) {
