@@ -45,7 +45,7 @@ button {
 }
 
 .app-shell {
-  width: min(1160px, calc(100% - 32px));
+  width: min(1420px, calc(100% - 32px));
   margin: 0 auto;
   padding: 28px 0 40px;
 }
@@ -356,7 +356,7 @@ h2 {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 0;
 }
@@ -378,8 +378,21 @@ h2 {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), var(--coral-soft));
 }
 
-.calorie-panel {
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.34fr);
+  gap: 18px;
+  align-items: start;
   margin-top: 18px;
+}
+
+.dashboard-side {
+  display: grid;
+  gap: 18px;
+}
+
+.calorie-panel {
+  margin-top: 0;
 }
 
 .calorie-balance-label {
@@ -457,7 +470,7 @@ h2 {
 
 .calorie-combo-chart {
   width: 100%;
-  min-width: 620px;
+  min-width: 760px;
   display: block;
 }
 
@@ -711,6 +724,35 @@ legend {
   margin-top: 22px;
 }
 
+.daily-status-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.daily-status-list {
+  display: grid;
+  gap: 10px;
+}
+
+.status-pill {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  color: var(--muted);
+  font-weight: 850;
+  padding: 10px 12px;
+}
+
+.status-pill.is-done {
+  border-color: rgba(47, 133, 90, 0.26);
+  background: var(--green-soft);
+  color: #1d5a3c;
+}
+
 .progress-label {
   display: flex;
   justify-content: space-between;
@@ -743,12 +785,6 @@ legend {
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: center;
-}
-
-.demo-actions {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
 }
 
 .cloud-feedback {
@@ -939,6 +975,7 @@ legend {
   }
 
   .hero,
+  .dashboard-grid,
   .workspace,
   .field-row {
     grid-template-columns: 1fr;

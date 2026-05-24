@@ -127,14 +127,6 @@
             </form>
           </section>
 
-          <section class="settings-section">
-            <h3>デモデータ</h3>
-            <p>直近2週間分の仮データを端末内に入れて、画面の見え方を確認できます。</p>
-            <div class="demo-actions">
-              <button id="load-demo-data" class="primary-button" type="button">デモデータを入れる</button>
-            </div>
-            <p id="demo-feedback" class="cloud-feedback" role="status" aria-live="polite">本番データの代わりに見た目確認用として使えます。</p>
-          </section>
         </div>
       </section>
     </div>
@@ -182,53 +174,71 @@
             </div>
           </section>
 
-          <section class="panel calorie-panel" aria-labelledby="calorie-heading">
-            <div class="panel-heading">
-              <div>
-                <p class="section-kicker">Calories</p>
-                <h2 id="calorie-heading">カロリーバランス</h2>
+          <div class="dashboard-grid">
+            <section class="panel calorie-panel" aria-labelledby="calorie-heading">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">Calories</p>
+                  <h2 id="calorie-heading">カロリーバランス</h2>
+                </div>
+                <span id="calorie-balance-label" class="calorie-balance-label">記録すると表示されます</span>
               </div>
-              <span id="calorie-balance-label" class="calorie-balance-label">記録すると表示されます</span>
-            </div>
-            <div class="calorie-summary">
-              <div><span>摂取</span><strong id="intake-calorie-label">-- kcal</strong></div>
-              <div><span>消費</span><strong id="burn-calorie-label">-- kcal</strong></div>
-              <div><span>体重</span><strong id="combo-weight-label">-- kg</strong></div>
-            </div>
-            <div class="range-tabs" aria-label="グラフ表示期間">
-              <button type="button" data-range-days="730">2年</button>
-              <button type="button" data-range-days="365">1年</button>
-              <button type="button" data-range-days="183">6か月</button>
-              <button type="button" data-range-days="92">3か月</button>
-              <button type="button" data-range-days="31" class="is-active">1か月</button>
-              <button type="button" data-range-days="7">1週間</button>
-            </div>
-            <div class="calorie-chart-wrap">
-              <svg id="calorie-combo-chart" class="calorie-combo-chart" viewBox="0 0 720 260" role="img" aria-labelledby="calorie-chart-title">
-                <title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>
-              </svg>
-            </div>
-            <p id="calorie-chart-empty" class="empty">摂取カロリー、消費カロリー、体重のどれかを記録するとグラフが表示されます。</p>
-          </section>
+              <div class="calorie-summary">
+                <div><span>摂取</span><strong id="intake-calorie-label">-- kcal</strong></div>
+                <div><span>消費</span><strong id="burn-calorie-label">-- kcal</strong></div>
+                <div><span>体重</span><strong id="combo-weight-label">-- kg</strong></div>
+              </div>
+              <div class="range-tabs" aria-label="グラフ表示期間">
+                <button type="button" data-range-days="730">2年</button>
+                <button type="button" data-range-days="365">1年</button>
+                <button type="button" data-range-days="183">6か月</button>
+                <button type="button" data-range-days="92">3か月</button>
+                <button type="button" data-range-days="31" class="is-active">1か月</button>
+                <button type="button" data-range-days="7">1週間</button>
+              </div>
+              <div class="calorie-chart-wrap">
+                <svg id="calorie-combo-chart" class="calorie-combo-chart" viewBox="0 0 720 260" role="img" aria-labelledby="calorie-chart-title">
+                  <title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>
+                </svg>
+              </div>
+              <p id="calorie-chart-empty" class="empty">摂取カロリー、消費カロリー、体重のどれかを記録するとグラフが表示されます。</p>
+            </section>
 
-          <section class="panel insights">
-            <div class="panel-heading">
-              <div>
-                <p class="section-kicker">Progress</p>
-                <h2>今週の行動達成</h2>
-              </div>
-              <button id="clear-today" class="ghost-button" type="button">今日を消す</button>
-            </div>
-            <div class="progress-block">
-              <div class="progress-label">
-                <span>健康行動の達成率</span>
-                <strong id="habit-progress-label">0%</strong>
-              </div>
-              <div class="progress-track">
-                <div id="habit-progress" class="progress-fill"></div>
-              </div>
-            </div>
-          </section>
+            <aside class="dashboard-side" aria-label="ダッシュボード補助情報">
+              <section class="panel insights">
+                <div class="panel-heading">
+                  <div>
+                    <p class="section-kicker">Progress</p>
+                    <h2>今週の行動達成</h2>
+                  </div>
+                  <button id="clear-today" class="ghost-button" type="button">今日を消す</button>
+                </div>
+                <div class="progress-block">
+                  <div class="progress-label">
+                    <span>健康行動の達成率</span>
+                    <strong id="habit-progress-label">0%</strong>
+                  </div>
+                  <div class="progress-track">
+                    <div id="habit-progress" class="progress-fill"></div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel daily-status-panel">
+                <div class="panel-heading">
+                  <div>
+                    <p class="section-kicker">Today</p>
+                    <h2>今日の入力状況</h2>
+                  </div>
+                </div>
+                <div class="daily-status-list">
+                  <span id="weight-status-pill" class="status-pill">体重 未入力</span>
+                  <span id="food-status-pill" class="status-pill">食事 未入力</span>
+                  <span id="exercise-status-pill" class="status-pill">運動 未入力</span>
+                </div>
+              </section>
+            </aside>
+          </div>
         </section>
 
         <section id="weight-page" class="app-page" data-page="weight">
