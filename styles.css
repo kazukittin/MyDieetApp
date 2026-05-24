@@ -403,7 +403,7 @@ h2 {
 
 .calorie-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -452,6 +452,24 @@ h2 {
   fill: #fffdfa;
   stroke: var(--coral);
   stroke-width: 3;
+}
+
+.combo-weight-line {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.combo-weight-dot {
+  fill: #fffdfa;
+  stroke: var(--blue);
+  stroke-width: 3;
+}
+
+.combo-weight-axis {
+  fill: var(--blue);
 }
 
 .workspace {

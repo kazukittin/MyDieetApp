@@ -707,6 +707,7 @@ function renderCalorieDashboard(entry) {
 
   document.querySelector("#intake-calorie-label").textContent = intake === null ? "-- kcal" : `${Math.round(intake)} kcal`;
   document.querySelector("#burn-calorie-label").textContent = burn === null ? "-- kcal" : `${Math.round(burn)} kcal`;
+  document.querySelector("#combo-weight-label").textContent = entry?.weight === null || entry?.weight === undefined ? "-- kg" : `${entry.weight.toFixed(1)} kg`;
 
   const balanceLabel = document.querySelector("#calorie-balance-label");
   if (intake === null && burn === null) {
@@ -725,12 +726,12 @@ function renderCalorieComboChart() {
   const svg = document.querySelector("#calorie-combo-chart");
   const empty = document.querySelector("#calorie-chart-empty");
   const points = entries
-    .filter((item) => item.intakeCalories !== null || item.burnCalories !== null)
+    .filter((item) => item.intakeCalories !== null || item.burnCalories !== null || item.weight !== null)
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-14);
 
-  svg.innerHTML = '<title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ</title>';
+  svg.innerHTML = '<title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>';
   if (!points.length) {
     svg.hidden = true;
     empty.hidden = false;
@@ -742,15 +743,20 @@ function renderCalorieComboChart() {
 
   const width = 720;
   const height = 260;
-  const pad = { top: 24, right: 24, bottom: 42, left: 58 };
-  const values = points.flatMap((point) => [point.intakeCalories, point.burnCalories]).filter((value) => value !== null);
-  const max = Math.max(500, Math.ceil(Math.max(...values) / 250) * 250);
+  const pad = { top: 24, right: 58, bottom: 42, left: 58 };
+  const calorieValues = points.flatMap((point) => [point.intakeCalories, point.burnCalories]).filter((value) => value !== null);
+  const weightValues = points.map((point) => point.weight).filter((value) => value !== null);
+  const max = calorieValues.length ? Math.max(500, Math.ceil(Math.max(...calorieValues) / 250) * 250) : 500;
+  const minWeight = weightValues.length ? Math.floor((Math.min(...weightValues) - 0.5) * 10) / 10 : 0;
+  const maxWeight = weightValues.length ? Math.ceil((Math.max(...weightValues) + 0.5) * 10) / 10 : 1;
+  const weightRange = Math.max(0.1, maxWeight - minWeight);
   const innerWidth = width - pad.left - pad.right;
   const innerHeight = height - pad.top - pad.bottom;
   const step = innerWidth / Math.max(1, points.length);
   const barWidth = Math.min(32, Math.max(14, step * 0.45));
   const xCenter = (index) => pad.left + step * index + step / 2;
   const y = (value) => pad.top + innerHeight - ((value || 0) / max) * innerHeight;
+  const yWeight = (value) => pad.top + innerHeight - ((value - minWeight) / weightRange) * innerHeight;
   let intakeIndex = 0;
   const linePoints = points
     .map((point, index) => {
@@ -758,6 +764,16 @@ function renderCalorieComboChart() {
       const command = intakeIndex === 0 ? "M" : "L";
       intakeIndex += 1;
       return `${command} ${xCenter(index).toFixed(1)} ${y(point.intakeCalories).toFixed(1)}`;
+    })
+    .filter(Boolean)
+    .join(" ");
+  let weightIndex = 0;
+  const weightLinePoints = points
+    .map((point, index) => {
+      if (point.weight === null) return null;
+      const command = weightIndex === 0 ? "M" : "L";
+      weightIndex += 1;
+      return `${command} ${xCenter(index).toFixed(1)} ${yWeight(point.weight).toFixed(1)}`;
     })
     .filter(Boolean)
     .join(" ");
@@ -770,10 +786,18 @@ function renderCalorieComboChart() {
   const dots = points
     .map((point, index) => point.intakeCalories === null ? "" : `<circle class="calorie-intake-dot" cx="${xCenter(index).toFixed(1)}" cy="${y(point.intakeCalories).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 摂取 ${Math.round(point.intakeCalories)}kcal</title></circle>`)
     .join("");
+  const weightDots = points
+    .map((point, index) => point.weight === null ? "" : `<circle class="combo-weight-dot" cx="${xCenter(index).toFixed(1)}" cy="${yWeight(point.weight).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 体重 ${point.weight.toFixed(1)}kg</title></circle>`)
+    .join("");
   const grid = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
     const value = Math.round(max * (1 - ratio));
     const yy = pad.top + innerHeight * ratio;
     return `<g><line class="chart-grid" x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}"></line><text class="chart-label" x="10" y="${yy + 4}">${value}</text></g>`;
+  }).join("");
+  const weightAxis = [0, 0.5, 1].map((ratio) => {
+    const value = maxWeight - weightRange * ratio;
+    const yy = pad.top + innerHeight * ratio;
+    return `<text class="chart-label combo-weight-axis" x="${width - 10}" y="${yy + 4}" text-anchor="end">${value.toFixed(1)}kg</text>`;
   }).join("");
   const labels = points.map((point, index) => {
     if (points.length > 7 && index % 2 === 1 && index !== points.length - 1) return "";
@@ -785,6 +809,9 @@ function renderCalorieComboChart() {
     ${bars}
     <path class="calorie-intake-line" d="${linePoints}"></path>
     ${dots}
+    <path class="combo-weight-line" d="${weightLinePoints}"></path>
+    ${weightDots}
+    ${weightAxis}
     ${labels}
   `);
 }
