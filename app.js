@@ -715,6 +715,7 @@ function bytesFromBase64(text) {
 
 function render() {
   renderSummary();
+  renderWeightPageSummary();
   renderWeightChart();
   renderHistory();
   fillFormForDate(dateInput.value, false);
@@ -960,6 +961,51 @@ function renderHistory() {
     .join("");
 }
 
+function renderWeightPageSummary() {
+  const latestMorning = entries.find((entry) => numberOrNull(entry.weightMorning) !== null);
+  const latestNight = entries.find((entry) => numberOrNull(entry.weightNight) !== null);
+  const latestGap = entries.find((entry) => numberOrNull(entry.weightMorning) !== null && numberOrNull(entry.weightNight) !== null);
+  const monthChange = getWeightChangeForDays(30);
+
+  setWeightMetric("#weight-morning-latest", "#weight-morning-detail", latestMorning?.weightMorning, latestMorning ? `${formatDateLabel(latestMorning.date)}の朝` : "朝の記録で表示");
+  setWeightMetric("#weight-night-latest", "#weight-night-detail", latestNight?.weightNight, latestNight ? `${formatDateLabel(latestNight.date)}の夜` : "夜の記録で表示");
+
+  if (latestGap) {
+    const gap = latestGap.weightNight - latestGap.weightMorning;
+    document.querySelector("#weight-day-gap").textContent = `${gap >= 0 ? "+" : ""}${gap.toFixed(1)} kg`;
+    document.querySelector("#weight-day-gap-detail").textContent = `${formatDateLabel(latestGap.date)}の朝夜差`;
+  } else {
+    document.querySelector("#weight-day-gap").textContent = "-- kg";
+    document.querySelector("#weight-day-gap-detail").textContent = "同じ日の朝夜で計算";
+  }
+
+  if (monthChange === null) {
+    document.querySelector("#weight-month-change").textContent = "-- kg";
+    document.querySelector("#weight-month-change-detail").textContent = "2件以上で表示";
+  } else {
+    document.querySelector("#weight-month-change").textContent = `${monthChange >= 0 ? "+" : ""}${monthChange.toFixed(1)} kg`;
+    document.querySelector("#weight-month-change-detail").textContent = "直近30日の代表体重";
+  }
+}
+
+function setWeightMetric(valueSelector, detailSelector, value, detail) {
+  const weight = numberOrNull(value);
+  document.querySelector(valueSelector).textContent = weight === null ? "-- kg" : `${weight.toFixed(1)} kg`;
+  document.querySelector(detailSelector).textContent = detail;
+}
+
+function getWeightChangeForDays(days) {
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+  const points = entries
+    .filter((entry) => hasWeightEntry(entry) && new Date(`${entry.date}T00:00:00`) >= start)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (points.length < 2) return null;
+  return getPrimaryWeight(points[points.length - 1]) - getPrimaryWeight(points[0]);
+}
+
 function getWeightHistoryLabel(entry) {
   const morning = numberOrNull(entry.weightMorning);
   const night = numberOrNull(entry.weightNight);
@@ -994,14 +1040,18 @@ function renderWeightChart() {
   const width = 720;
   const height = 280;
   const pad = { top: 22, right: 26, bottom: 42, left: 52 };
-  const weights = points.map(getPrimaryWeight);
+  const weights = points
+    .flatMap((point) => [getPrimaryWeight(point), numberOrNull(point.weightMorning), numberOrNull(point.weightNight)])
+    .filter((weight) => weight !== null);
   const min = Math.floor(Math.min(...weights) - 0.5);
   const max = Math.ceil(Math.max(...weights) + 0.5);
   const range = Math.max(1, max - min);
   const xStep = (width - pad.left - pad.right) / Math.max(1, points.length - 1);
   const x = (index) => pad.left + index * xStep;
   const y = (weight) => pad.top + ((max - weight) / range) * (height - pad.top - pad.bottom);
-  const actualPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(getPrimaryWeight(point)).toFixed(1)}`).join(" ");
+  const morningPath = buildWeightPath(points, x, y, (point) => numberOrNull(point.weightMorning));
+  const nightPath = buildWeightPath(points, x, y, (point) => numberOrNull(point.weightNight));
+  const fallbackPath = !morningPath && !nightPath ? buildWeightPath(points, x, y, getPrimaryWeight) : "";
   const averagePoints = points.map((point, index) => ({
     date: point.date,
     weight: averageWeight(points.slice(Math.max(0, index - 6), index + 1)),
@@ -1016,18 +1066,45 @@ function renderWeightChart() {
     .filter((value, index, array) => array.indexOf(value) === index)
     .map((index) => `<text class="chart-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${formatShortDate(points[index].date)}</text>`)
     .join("");
-  const dots = points.map((point, index) => {
-    const weight = getPrimaryWeight(point);
-    return `<circle class="chart-dot" cx="${x(index)}" cy="${y(weight)}" r="4"><title>${formatDateLabel(point.date)} ${weight.toFixed(1)}kg</title></circle>`;
-  }).join("");
+  const morningDots = buildWeightDots(points, x, y, (point) => numberOrNull(point.weightMorning), "chart-morning-dot", "朝");
+  const nightDots = buildWeightDots(points, x, y, (point) => numberOrNull(point.weightNight), "chart-night-dot", "夜");
+  const fallbackDots = !morningPath && !nightPath ? buildWeightDots(points, x, y, getPrimaryWeight, "chart-dot", "体重") : "";
 
   svg.insertAdjacentHTML("beforeend", `
     ${grid}
     <path class="chart-average" d="${averagePath}"></path>
-    <path class="chart-line" d="${actualPath}"></path>
-    ${dots}
+    ${fallbackPath ? `<path class="chart-line" d="${fallbackPath}"></path>` : ""}
+    ${morningPath ? `<path class="chart-morning-line" d="${morningPath}"></path>` : ""}
+    ${nightPath ? `<path class="chart-night-line" d="${nightPath}"></path>` : ""}
+    ${fallbackDots}
+    ${morningDots}
+    ${nightDots}
     ${labels}
   `);
+}
+
+function buildWeightPath(points, x, y, getValue) {
+  let lineIndex = 0;
+  return points
+    .map((point, index) => {
+      const weight = getValue(point);
+      if (weight === null) return null;
+      const command = lineIndex === 0 ? "M" : "L";
+      lineIndex += 1;
+      return `${command} ${x(index).toFixed(1)} ${y(weight).toFixed(1)}`;
+    })
+    .filter(Boolean)
+    .join(" ");
+}
+
+function buildWeightDots(points, x, y, getValue, className, label) {
+  return points
+    .map((point, index) => {
+      const weight = getValue(point);
+      if (weight === null) return "";
+      return `<circle class="${className}" cx="${x(index)}" cy="${y(weight)}" r="4"><title>${formatDateLabel(point.date)} ${label} ${weight.toFixed(1)}kg</title></circle>`;
+    })
+    .join("");
 }
 
 function averageWeight(items) {

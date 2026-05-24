@@ -361,6 +361,13 @@ h2 {
   margin-bottom: 0;
 }
 
+.weight-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
 .metric {
   min-height: 138px;
   padding: 18px;
@@ -555,6 +562,10 @@ form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.weight-log-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 label {
@@ -859,25 +870,36 @@ legend {
 
 .chart-legend {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   color: var(--muted);
   font-weight: 800;
 }
 
-.chart-legend i,
-.chart-legend b {
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.chart-legend i {
   width: 22px;
   height: 4px;
   border-radius: 999px;
   display: inline-block;
 }
 
-.chart-legend i {
+.legend-morning {
+  background: var(--blue);
+}
+
+.legend-night {
   background: var(--green);
 }
 
-.chart-legend b {
+.legend-average {
   background: var(--coral);
 }
 
@@ -905,7 +927,9 @@ legend {
 }
 
 .chart-line,
-.chart-average {
+.chart-average,
+.chart-morning-line,
+.chart-night-line {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -916,16 +940,36 @@ legend {
   stroke-width: 4;
 }
 
+.chart-morning-line {
+  stroke: var(--blue);
+  stroke-width: 4;
+}
+
+.chart-night-line {
+  stroke: var(--green);
+  stroke-width: 4;
+}
+
 .chart-average {
   stroke: var(--coral);
   stroke-width: 3;
   stroke-dasharray: 8 8;
 }
 
-.chart-dot {
+.chart-dot,
+.chart-morning-dot,
+.chart-night-dot {
   fill: #fffdfa;
-  stroke: var(--green);
   stroke-width: 3;
+}
+
+.chart-dot,
+.chart-night-dot {
+  stroke: var(--green);
+}
+
+.chart-morning-dot {
+  stroke: var(--blue);
 }
 
 .history-list {
@@ -989,6 +1033,11 @@ legend {
 
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .weight-summary-grid,
+  .weight-log-grid {
+    grid-template-columns: 1fr;
   }
 
   .hero-copy {
@@ -1059,6 +1108,10 @@ legend {
 
 @media (max-width: 460px) {
   .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .weight-summary-grid {
     grid-template-columns: 1fr;
   }
 

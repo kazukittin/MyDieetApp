@@ -259,6 +259,29 @@
             <span>日々の増減より流れを見る</span>
           </div>
 
+          <section class="weight-summary-grid" aria-label="体重推移の概要">
+            <article class="metric">
+              <span>最新の朝体重</span>
+              <strong id="weight-morning-latest">-- kg</strong>
+              <small id="weight-morning-detail">朝の記録で表示</small>
+            </article>
+            <article class="metric">
+              <span>最新の夜体重</span>
+              <strong id="weight-night-latest">-- kg</strong>
+              <small id="weight-night-detail">夜の記録で表示</small>
+            </article>
+            <article class="metric">
+              <span>朝夜差</span>
+              <strong id="weight-day-gap">-- kg</strong>
+              <small id="weight-day-gap-detail">同じ日の朝夜で計算</small>
+            </article>
+            <article class="metric">
+              <span>30日変化</span>
+              <strong id="weight-month-change">-- kg</strong>
+              <small id="weight-month-change-detail">代表体重で計算</small>
+            </article>
+          </section>
+
           <section class="workspace single-column">
             <section class="panel">
               <div class="panel-heading">
@@ -268,7 +291,7 @@
                 </div>
                 <input type="date" id="entry-date" name="date" required>
               </div>
-              <div class="field-row">
+              <div class="field-row weight-log-grid">
                 <label class="field-card">
                   <span>朝の体重 kg</span>
                   <input type="number" id="weight-morning" name="weightMorning" min="20" max="250" step="0.1" placeholder="62.4">
@@ -292,7 +315,11 @@
                   <p class="section-kicker">Trend</p>
                   <h2>体重の推移</h2>
                 </div>
-                <span class="chart-legend"><i></i>代表体重 <b></b>7日平均</span>
+                <span class="chart-legend">
+                  <span class="legend-item"><i class="legend-morning"></i>朝</span>
+                  <span class="legend-item"><i class="legend-night"></i>夜</span>
+                  <span class="legend-item"><i class="legend-average"></i>7日平均</span>
+                </span>
               </div>
               <div class="chart-wrap">
                 <svg id="weight-chart" class="weight-chart" viewBox="0 0 720 280" role="img" aria-labelledby="weight-chart-title">
