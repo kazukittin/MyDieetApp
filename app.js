@@ -19,6 +19,8 @@ const openSettingsButton = document.querySelector("#open-settings");
 const closeSettingsButton = document.querySelector("#close-settings");
 const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
+const loadDemoDataButton = document.querySelector("#load-demo-data");
+const demoFeedback = document.querySelector("#demo-feedback");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const canUseServerSync = isPrivateHost(location.hostname);
@@ -245,6 +247,21 @@ profileForm.addEventListener("submit", (event) => {
       setProfileFeedback("error", getCloudErrorMessage(error));
     });
   }
+});
+
+loadDemoDataButton.addEventListener("click", () => {
+  const shouldLoad = confirm("現在の端末内データをデモデータに置き換えます。クラウドには同期しません。");
+  if (!shouldLoad) return;
+  const demo = buildDemoData();
+  entries = demo.entries;
+  profile = demo.profile;
+  localStorage.setItem(storageKey, JSON.stringify(entries));
+  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  fillProfileForm();
+  fillFormForDate(isoToday);
+  render();
+  setDemoFeedback("success", "デモデータを入れました。ダッシュボードやグラフを確認できます。");
+  switchPage("dashboard");
 });
 
 function loadEntries() {
@@ -509,6 +526,61 @@ function setCloudFeedback(type, message) {
 function setProfileFeedback(type, message) {
   profileFeedback.textContent = message;
   profileFeedback.className = `cloud-feedback is-${type}`;
+}
+
+function setDemoFeedback(type, message) {
+  demoFeedback.textContent = message;
+  demoFeedback.className = `cloud-feedback is-${type}`;
+}
+
+function buildDemoData() {
+  const demoEntries = [];
+  const baseWeight = 72.4;
+  const start = new Date(today);
+  start.setDate(start.getDate() - 13);
+  const intakeValues = [2050, 1980, 2140, 1900, 2020, 1850, 1970, 1930, 1880, 1990, 1820, 1900, 1760, 1840];
+  const burnValues = [260, 340, 220, 410, 300, 520, 280, 360, 430, 310, 540, 380, 460, 420];
+  const sleepValues = [6.5, 7, 6, 7.5, 6.5, 8, 7, 6, 7.5, 6.5, 7, 8, 7.5, 7];
+  const moods = ["calm", "good", "tired", "calm", "good", "good", "calm", "stress", "calm", "good", "good", "calm", "good", "calm"];
+
+  for (let index = 0; index < 14; index += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const weight = baseWeight - index * 0.13 + (index % 3 === 0 ? 0.15 : index % 4 === 0 ? -0.08 : 0);
+    const habits = ["water", "protein", "vegetables"];
+    if (index % 2 === 0) habits.push("walk");
+    if (index % 3 !== 0) habits.push("no_snack");
+    if (index % 4 !== 0) habits.push("slow_eating");
+    if (index % 5 === 0) habits.push("stretch");
+
+    demoEntries.push({
+      date: toIsoDate(date),
+      weight: Number(weight.toFixed(1)),
+      sleep: sleepValues[index],
+      intakeCalories: intakeValues[index],
+      burnCalories: burnValues[index],
+      meal: index % 5 === 0 ? 2 : 3,
+      meals: index % 4 === 0 ? ["breakfast", "lunch", "dinner"] : ["breakfast", "lunch", "dinner", "snack"],
+      habits,
+      mood: moods[index],
+      note: index === 13 ? "デモ: 今日は歩けた。夜は軽めにする。" : "",
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return {
+    entries: demoEntries.sort((a, b) => b.date.localeCompare(a.date)),
+    profile: {
+      startDate: demoEntries[0].date,
+      startWeight: 72.4,
+      goalWeight: 68,
+      height: 170,
+      pace: "steady",
+      note: "デモ: 週平均でゆっくり落とす",
+      skipped: false,
+      updatedAt: new Date().toISOString(),
+    },
+  };
 }
 
 function setSaveFeedback(scope, type, message) {

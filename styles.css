@@ -769,6 +769,12 @@ legend {
   align-items: center;
 }
 
+.demo-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .cloud-feedback {
   margin: 0;
   border-radius: 8px;
