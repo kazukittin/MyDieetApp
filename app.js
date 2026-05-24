@@ -52,6 +52,8 @@ let cloudConfig = loadCloudConfig();
 let profile = loadProfile();
 let comboChartRangeDays = 31;
 
+purgeLegacySampleData();
+
 dateInput.value = isoToday;
 if (document.querySelector("#today-label")) {
   document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
@@ -342,6 +344,23 @@ function loadProfile() {
   }
 }
 
+function purgeLegacySampleData() {
+  const legacyNoteMarker = "\u30c7\u30e2";
+  const legacyExerciseMarker = "\u5915\u65b9\u306b\u30a6\u30a9\u30fc\u30ad\u30f3\u30b0";
+  const profileLooksLegacy = String(profile.note || "").includes(legacyNoteMarker);
+  const entriesLookLegacy = entries.some((entry) => (
+    String(entry.note || "").includes(legacyNoteMarker)
+    || String(entry.exerciseNote || "").includes(legacyExerciseMarker)
+  ));
+
+  if (!profileLooksLegacy && !entriesLookLegacy) return;
+
+  entries = [];
+  profile = {};
+  localStorage.removeItem(storageKey);
+  localStorage.removeItem(profileStorageKey);
+}
+
 function normalizeEntryWeights(entry) {
   if (!entry || typeof entry !== "object") return entry;
   const weightMorning = numberOrNull(entry.weightMorning);
@@ -422,6 +441,7 @@ async function syncFromServer() {
     const serverEntries = await response.json();
     if (Array.isArray(serverEntries)) {
       entries = mergeEntries(entries, serverEntries);
+      purgeLegacySampleData();
       entries.sort((a, b) => b.date.localeCompare(a.date));
       localStorage.setItem(storageKey, JSON.stringify(entries));
       if (entries.length !== serverEntries.length) saveEntries();
@@ -486,6 +506,7 @@ async function syncFromCloud(options = {}) {
       profile = cloudData.profile;
       localStorage.setItem(profileStorageKey, JSON.stringify(profile));
     }
+    purgeLegacySampleData();
     entries.sort((a, b) => b.date.localeCompare(a.date));
     localStorage.setItem(storageKey, JSON.stringify(entries));
     await pushEntriesToCloud();
