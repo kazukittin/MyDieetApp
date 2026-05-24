@@ -382,9 +382,28 @@ h2 {
   align-items: start;
 }
 
+.exercise-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.exercise-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 0.62fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .weight-log-panel,
 .chart-panel,
 .history-panel {
+  margin-top: 0;
+}
+
+.exercise-log-panel,
+.exercise-history-panel {
   margin-top: 0;
 }
 
@@ -603,6 +622,10 @@ form {
 
 .weight-log-grid {
   grid-template-columns: 1fr;
+}
+
+.exercise-input-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 label {
@@ -1031,6 +1054,36 @@ legend {
   color: var(--muted);
 }
 
+.exercise-history-list {
+  display: grid;
+  gap: 10px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.exercise-history-item {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 12px 0 0;
+}
+
+.exercise-history-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.exercise-history-item strong {
+  display: block;
+}
+
+.exercise-history-item span,
+.exercise-history-item div:last-child {
+  color: var(--muted);
+  font-weight: 750;
+}
+
 .score-pill {
   border-radius: 999px;
   padding: 7px 10px;
@@ -1060,6 +1113,8 @@ legend {
   .dashboard-grid,
   .weight-top-grid,
   .weight-detail-grid,
+  .exercise-summary-grid,
+  .exercise-grid,
   .workspace,
   .field-row {
     grid-template-columns: 1fr;
@@ -1071,6 +1126,11 @@ legend {
 
   .weight-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .exercise-summary-grid,
+  .exercise-input-grid {
+    grid-template-columns: 1fr;
   }
 
   .hero-copy {
@@ -1145,6 +1205,10 @@ legend {
   }
 
   .weight-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exercise-summary-grid {
     grid-template-columns: 1fr;
   }
 

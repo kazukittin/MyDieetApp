@@ -72,6 +72,10 @@ form.addEventListener("submit", (event) => {
     sleep: previous?.sleep ?? null,
     intakeCalories: previous?.intakeCalories ?? null,
     burnCalories: previous?.burnCalories ?? null,
+    exerciseMinutes: previous?.exerciseMinutes ?? null,
+    exerciseType: previous?.exerciseType ?? "",
+    exerciseIntensity: previous?.exerciseIntensity ?? "normal",
+    exerciseNote: previous?.exerciseNote ?? "",
     meal: previous?.meal ?? 2,
     meals: previous?.meals ?? [],
     habits: previous?.habits ?? [],
@@ -104,6 +108,10 @@ form.addEventListener("submit", (event) => {
     const preservedFood = entry.habits.filter((habit) => foodHabitValues.includes(habit));
     const selectedExercise = selectedHabits.filter((habit) => exerciseHabitValues.includes(habit));
     entry.burnCalories = numberOrNull(formData.get("burnCalories"));
+    entry.exerciseMinutes = numberOrNull(formData.get("exerciseMinutes"));
+    entry.exerciseType = String(formData.get("exerciseType") || "");
+    entry.exerciseIntensity = String(formData.get("exerciseIntensity") || "normal");
+    entry.exerciseNote = String(formData.get("exerciseNote") || "").trim();
     entry.habits = [...new Set([...preservedFood, ...selectedExercise])];
   }
 
@@ -217,6 +225,10 @@ onboardingForm.addEventListener("submit", (event) => {
       sleep: null,
       intakeCalories: null,
       burnCalories: null,
+      exerciseMinutes: null,
+      exerciseType: "",
+      exerciseIntensity: "normal",
+      exerciseNote: "",
       meal: 3,
       meals: [],
       habits: ["water"],
@@ -602,6 +614,10 @@ function buildDemoData() {
       sleep: sleepValues[index],
       intakeCalories: intakeValues[index],
       burnCalories: burnValues[index],
+      exerciseMinutes: [25, 35, 15, 40, 30, 55, 25, 30, 45, 20, 50, 35, 45, 40][index],
+      exerciseType: index % 5 === 0 ? "stretch" : index % 4 === 0 ? "strength" : index % 3 === 0 ? "bike" : "walk",
+      exerciseIntensity: index % 5 === 0 ? "light" : index % 3 === 0 ? "hard" : "normal",
+      exerciseNote: index === 13 ? "夕方にウォーキング。少し汗をかけた。" : "",
       meal: index % 5 === 0 ? 2 : 3,
       meals: index % 4 === 0 ? ["breakfast", "lunch", "dinner"] : ["breakfast", "lunch", "dinner", "snack"],
       habits,
@@ -716,6 +732,7 @@ function bytesFromBase64(text) {
 function render() {
   renderSummary();
   renderWeightPageSummary();
+  renderExercisePage();
   renderWeightChart();
   renderHistory();
   fillFormForDate(dateInput.value, false);
@@ -988,6 +1005,89 @@ function renderWeightPageSummary() {
   }
 }
 
+function renderExercisePage() {
+  const weekEntries = getRecentEntries(7);
+  const exerciseEntries = weekEntries.filter(hasExerciseEntry);
+  const totalMinutes = exerciseEntries.reduce((sum, entry) => sum + (entry.exerciseMinutes || 0), 0);
+  const totalBurn = exerciseEntries.reduce((sum, entry) => sum + (entry.burnCalories || 0), 0);
+  const todayEntry = entries.find((entry) => entry.date === dateInput.value);
+
+  document.querySelector("#exercise-week-minutes").textContent = totalMinutes ? `${Math.round(totalMinutes)} 分` : "-- 分";
+  document.querySelector("#exercise-week-minutes-detail").textContent = exerciseEntries.length ? `${exerciseEntries.length}日の記録から計算` : "時間を入れると表示";
+  document.querySelector("#exercise-week-burn").textContent = totalBurn ? `${Math.round(totalBurn)} kcal` : "-- kcal";
+  document.querySelector("#exercise-week-burn-detail").textContent = exerciseEntries.length ? "直近7日の合計" : "消費カロリーから計算";
+  document.querySelector("#exercise-week-days").textContent = exerciseEntries.length ? `${exerciseEntries.length} 日` : "-- 日";
+
+  if (hasExerciseEntry(todayEntry)) {
+    document.querySelector("#exercise-today-status").textContent = todayEntry.exerciseType ? getExerciseTypeLabel(todayEntry.exerciseType) : "入力済み";
+    document.querySelector("#exercise-today-detail").textContent = getExerciseDetailLabel(todayEntry);
+  } else {
+    document.querySelector("#exercise-today-status").textContent = "未入力";
+    document.querySelector("#exercise-today-detail").textContent = "保存すると表示";
+  }
+
+  renderExerciseHistory();
+}
+
+function renderExerciseHistory() {
+  const list = document.querySelector("#exercise-history-list");
+  if (!list) return;
+  const exerciseEntries = entries.filter(hasExerciseEntry).slice(0, 14);
+  if (!exerciseEntries.length) {
+    list.innerHTML = '<p class="empty">まだ運動記録がありません。短い運動から残してみましょう。</p>';
+    return;
+  }
+
+  list.innerHTML = exerciseEntries
+    .map((entry) => `
+      <article class="exercise-history-item">
+        <div>
+          <strong>${formatDateLabel(entry.date)}</strong>
+          <span>${getExerciseTypeLabel(entry.exerciseType)} / ${getExerciseIntensityLabel(entry.exerciseIntensity)}</span>
+        </div>
+        <div>${getExerciseDetailLabel(entry)}</div>
+      </article>
+    `)
+    .join("");
+}
+
+function hasExerciseEntry(entry) {
+  return Boolean(entry && (
+    numberOrNull(entry.burnCalories) !== null
+    || numberOrNull(entry.exerciseMinutes) !== null
+    || entry.exerciseType
+    || getExerciseHabits(entry).length
+  ));
+}
+
+function getExerciseHabits(entry) {
+  return (entry?.habits || []).filter((habit) => exerciseHabitValues.includes(habit));
+}
+
+function getExerciseDetailLabel(entry) {
+  const minutes = entry.exerciseMinutes === null || entry.exerciseMinutes === undefined ? "--分" : `${Math.round(entry.exerciseMinutes)}分`;
+  const burn = entry.burnCalories === null || entry.burnCalories === undefined ? "--kcal" : `${Math.round(entry.burnCalories)}kcal`;
+  const habits = getExerciseHabits(entry).map(getExerciseTypeLabel).filter(Boolean).join("・");
+  return habits ? `${minutes} / ${burn} / ${habits}` : `${minutes} / ${burn}`;
+}
+
+function getExerciseTypeLabel(value) {
+  const labels = {
+    walk: "ウォーキング",
+    run: "ランニング",
+    bike: "自転車",
+    strength: "筋トレ",
+    stretch: "ストレッチ",
+    other: "その他",
+  };
+  return labels[value] || "運動";
+}
+
+function getExerciseIntensityLabel(value) {
+  const labels = { light: "軽め", normal: "普通", hard: "きつめ" };
+  return labels[value] || "普通";
+}
+
 function setWeightMetric(valueSelector, detailSelector, value, detail) {
   const weight = numberOrNull(value);
   document.querySelector(valueSelector).textContent = weight === null ? "-- kg" : `${weight.toFixed(1)} kg`;
@@ -1122,6 +1222,12 @@ function fillFormForDate(date, overwrite = true) {
   document.querySelector("#sleep").value = entry.sleep ?? "";
   document.querySelector("#intake-calories").value = entry.intakeCalories ?? "";
   document.querySelector("#burn-calories").value = entry.burnCalories ?? "";
+  document.querySelector("#exercise-minutes").value = entry.exerciseMinutes ?? "";
+  document.querySelector("#exercise-type").value = entry.exerciseType ?? "";
+  const intensity = entry.exerciseIntensity || "normal";
+  const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${intensity}"]`);
+  if (intensityInput) intensityInput.checked = true;
+  document.querySelector("#exercise-note").value = entry.exerciseNote ?? "";
   document.querySelector(`input[name="meal"][value="${entry.meal}"]`).checked = true;
   document.querySelector("#mood").value = entry.mood;
   document.querySelector("#note").value = entry.note;
