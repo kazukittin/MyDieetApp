@@ -602,8 +602,89 @@ h2 {
 
 .exercise-preset-list {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  margin: 12px 0 18px;
+}
+
+.preset-help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.preset-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.exercise-preset-card {
+  position: relative;
+  min-height: 112px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.preset-apply-button {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  width: 100%;
+  min-height: 112px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 12px 48px 12px 12px;
+  text-align: left;
+}
+
+.preset-apply-button span {
+  width: fit-content;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 3px 7px;
+}
+
+.preset-apply-button small {
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.preset-delete-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--coral);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 5px;
+}
+
+.preset-apply-button:hover {
+  background: var(--blue-soft);
+}
+
+.preset-save-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  padding: 12px;
 }
 
 .food-preset-list {
@@ -1395,7 +1476,6 @@ legend {
   .weight-detail-grid,
   .exercise-summary-grid,
   .exercise-grid,
-  .exercise-preset-list,
   .food-preset-list,
   .meal-calorie-grid,
   .food-summary-grid,
@@ -1421,6 +1501,14 @@ legend {
   .exercise-summary-grid,
   .food-summary-grid,
   .exercise-input-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exercise-preset-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .preset-save-row {
     grid-template-columns: 1fr;
   }
 
@@ -1500,6 +1588,10 @@ legend {
   }
 
   .exercise-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exercise-preset-list {
     grid-template-columns: 1fr;
   }
 

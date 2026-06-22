@@ -29,8 +29,8 @@ const openSettingsButton = document.querySelector("#open-settings");
 const closeSettingsButton = document.querySelector("#close-settings");
 const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
-const applyTodayPresetButton = document.querySelector("#apply-today-preset");
-const saveWeekdayPresetButton = document.querySelector("#save-weekday-preset");
+const saveExercisePresetButton = document.querySelector("#save-exercise-preset");
+const exercisePresetNameInput = document.querySelector("#exercise-preset-name");
 const exercisePresetList = document.querySelector("#exercise-preset-list");
 const foodPresetList = document.querySelector("#food-preset-list");
 const pageButtons = document.querySelectorAll("[data-page-target]");
@@ -283,14 +283,8 @@ rangeButtons.forEach((button) => {
     renderCalorieComboChart();
   });
 });
-if (applyTodayPresetButton) {
-  applyTodayPresetButton.addEventListener("click", () => {
-    applyExercisePreset(getPresetForDate(dateInput.value || isoToday));
-    setSaveFeedback("exercise", "success", "今日の曜日メニューを入力しました。保存すると記録に残ります。");
-  });
-}
-if (saveWeekdayPresetButton) {
-  saveWeekdayPresetButton.addEventListener("click", saveCurrentExerciseAsWeekdayPreset);
+if (saveExercisePresetButton) {
+  saveExercisePresetButton.addEventListener("click", saveCurrentExerciseAsPreset);
 }
 document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
   input.addEventListener("input", updateIntakeCaloriesTotal);
@@ -412,22 +406,21 @@ function loadProfile() {
 function loadExercisePresets() {
   try {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(exercisePresetStorageKey)));
-    if (!Array.isArray(stored) || stored.length !== defaultExercisePresets.length) {
-      return getDefaultExercisePresets();
-    }
-    return defaultExercisePresets.map((preset, index) => normalizeExercisePreset({ ...preset, ...stored[index], day: preset.day }));
+    if (!Array.isArray(stored)) return [];
+    return stored.map(normalizeExercisePreset).filter((preset) => preset.name);
   } catch {
-    return getDefaultExercisePresets();
+    return [];
   }
 }
 
 function getDefaultExercisePresets() {
-  return defaultExercisePresets.map((preset) => ({ ...preset, habits: [...preset.habits] }));
+  return [];
 }
 
 function normalizeExercisePreset(preset) {
   return {
-    day: preset.day,
+    id: typeof preset.id === "string" ? preset.id : createId(),
+    name: String(preset.name || getLegacyPresetName(preset)).trim().slice(0, 40),
     type: typeof preset.type === "string" ? preset.type : "",
     minutes: numberOrNull(preset.minutes) ?? 0,
     burnCalories: numberOrNull(preset.burnCalories) ?? 0,
@@ -435,6 +428,15 @@ function normalizeExercisePreset(preset) {
     habits: Array.isArray(preset.habits) ? preset.habits.filter((habit) => exerciseHabitValues.includes(habit)) : [],
     note: typeof preset.note === "string" ? preset.note : "",
   };
+}
+
+function getLegacyPresetName(preset) {
+  if (!preset?.day) return "";
+  return `${preset.day}曜 ${getExerciseTypeLabel(preset.type)}`;
+}
+
+function createId() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function saveExercisePresets() {
@@ -596,9 +598,9 @@ async function syncFromCloud() {
       saveProfileToDevice();
     }
     if (Array.isArray(cloudData.exercisePresets)) {
-      exercisePresets = defaultExercisePresets.map((preset, index) => (
-        normalizeExercisePreset({ ...preset, ...cloudData.exercisePresets[index], day: preset.day })
-      ));
+      exercisePresets = cloudData.exercisePresets
+        .map(normalizeExercisePreset)
+        .filter((preset) => preset.name);
       saveExercisePresets();
     }
     purgeLegacySampleData();
@@ -1125,23 +1127,50 @@ function renderExercisePage() {
 
 function renderExercisePresets() {
   if (!exercisePresetList) return;
-  const selectedDay = new Date(`${dateInput.value || isoToday}T00:00:00`).getDay();
+  if (!exercisePresets.length) {
+    exercisePresetList.innerHTML = '<p class="empty preset-empty">まだプリセットがありません。下の運動内容とプリセット名を入力して追加できます。</p>';
+    return;
+  }
+
   exercisePresetList.innerHTML = exercisePresets
-    .map((preset, index) => `
-      <button class="preset-card ${index === selectedDay ? "is-today" : ""}" type="button" data-preset-day="${index}">
-        <span>${preset.day}</span>
-        <strong>${getExerciseTypeLabel(preset.type)}</strong>
-        <small>${preset.minutes}分 / ${preset.burnCalories}kcal / ${getExerciseIntensityLabel(preset.intensity)}</small>
-      </button>
+    .map((preset) => `
+      <article class="preset-card exercise-preset-card">
+        <button class="preset-apply-button" type="button" data-preset-id="${escapeHtml(preset.id)}">
+          <span>${escapeHtml(preset.name)}</span>
+          <strong>${getExerciseTypeLabel(preset.type)}</strong>
+          <small>${preset.minutes}分 / ${preset.burnCalories}kcal / ${getExerciseIntensityLabel(preset.intensity)}</small>
+        </button>
+        <button class="preset-delete-button" type="button" data-delete-preset-id="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を削除">削除</button>
+      </article>
     `)
     .join("");
 
-  exercisePresetList.querySelectorAll("[data-preset-day]").forEach((button) => {
+  exercisePresetList.querySelectorAll("[data-preset-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      applyExercisePreset(exercisePresets[Number(button.dataset.presetDay)]);
-      setSaveFeedback("exercise", "success", `${button.querySelector("span").textContent}曜メニューを入力しました。`);
+      const preset = exercisePresets.find((item) => item.id === button.dataset.presetId);
+      applyExercisePreset(preset);
+      setSaveFeedback("exercise", "success", `${preset.name}を入力しました。運動を保存すると記録に残ります。`);
     });
   });
+
+  exercisePresetList.querySelectorAll("[data-delete-preset-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      exercisePresets = exercisePresets.filter((item) => item.id !== button.dataset.deletePresetId);
+      saveExercisePresets();
+      syncExercisePresets();
+      renderExercisePresets();
+      setSaveFeedback("exercise", "success", "プリセットを削除しました。");
+    });
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function applyExercisePreset(preset) {
@@ -1157,12 +1186,17 @@ function applyExercisePreset(preset) {
   });
 }
 
-function saveCurrentExerciseAsWeekdayPreset() {
-  const selectedDate = dateInput.value || isoToday;
-  const selectedDay = new Date(`${selectedDate}T00:00:00`).getDay();
-  const currentDay = exercisePresets[selectedDay]?.day || defaultExercisePresets[selectedDay].day;
+function saveCurrentExerciseAsPreset() {
+  const name = exercisePresetNameInput.value.trim();
+  if (!name) {
+    setSaveFeedback("exercise", "error", "プリセット名を入力してください。");
+    exercisePresetNameInput.focus();
+    return;
+  }
+
   const preset = normalizeExercisePreset({
-    day: currentDay,
+    id: createId(),
+    name,
     type: document.querySelector("#exercise-type")?.value || "",
     minutes: document.querySelector("#exercise-minutes")?.value || 0,
     burnCalories: document.querySelector("#burn-calories")?.value || 0,
@@ -1173,15 +1207,20 @@ function saveCurrentExerciseAsWeekdayPreset() {
     note: document.querySelector("#exercise-note")?.value.trim() || "",
   });
 
-  exercisePresets[selectedDay] = preset;
+  exercisePresets.push(preset);
   saveExercisePresets();
+  syncExercisePresets();
+  exercisePresetNameInput.value = "";
+  renderExercisePresets();
+  setSaveFeedback("exercise", "success", `${preset.name}をプリセットに追加しました。`);
+}
+
+function syncExercisePresets() {
   if (activeUser) {
     pushEntriesToCloud().catch((error) => {
       setSaveFeedback("exercise", "error", getCloudErrorMessage(error));
     });
   }
-  renderExercisePresets();
-  setSaveFeedback("exercise", "success", `${currentDay}曜日のプリセットを保存しました。`);
 }
 
 function setExerciseTypeValue(value) {
@@ -1189,10 +1228,6 @@ function setExerciseTypeValue(value) {
   if (!select) return;
   const option = Array.from(select.options).find((item) => item.value === value);
   select.value = option ? value : "";
-}
-
-function getPresetForDate(date) {
-  return exercisePresets[new Date(`${date}T00:00:00`).getDay()];
 }
 
 function renderExerciseHistory() {

@@ -361,15 +361,12 @@
             <section class="panel exercise-log-panel">
               <div class="preset-header">
                 <div>
-                  <p class="section-kicker">Weekly presets</p>
-                  <h2>曜日メニュー</h2>
-                </div>
-                <div class="preset-actions">
-                  <button id="apply-today-preset" class="ghost-button" type="button">今日のメニューを入れる</button>
-                  <button id="save-weekday-preset" class="ghost-button" type="button">この内容を曜日プリセットに保存</button>
+                  <p class="section-kicker">Exercise presets</p>
+                  <h2>運動プリセット</h2>
                 </div>
               </div>
-              <div id="exercise-preset-list" class="exercise-preset-list" aria-label="曜日ごとの運動メニュー"></div>
+              <p class="preset-help">よく行う運動を登録し、カードを押して今日の運動へ入力できます。</p>
+              <div id="exercise-preset-list" class="exercise-preset-list" aria-label="登録した運動プリセット"></div>
 
               <div class="field-row exercise-input-grid">
                 <label class="field-card">
@@ -416,6 +413,13 @@
                 <span>運動メモ</span>
                 <textarea id="exercise-note" name="exerciseNote" rows="3" placeholder="例: 夕方に30分歩いた。膝は問題なし。"></textarea>
               </label>
+              <div class="preset-save-row">
+                <label>
+                  <span>プリセット名</span>
+                  <input id="exercise-preset-name" type="text" maxlength="40" placeholder="例: 朝のウォーキング">
+                </label>
+                <button id="save-exercise-preset" class="ghost-button" type="button">現在の内容をプリセットに追加</button>
+              </div>
               <button class="primary-button" type="submit" data-save-scope="exercise">運動を保存</button>
               <p id="exercise-save-feedback" class="save-feedback" role="status" aria-live="polite">今日できた運動を選んで保存できます。</p>
             </section>
