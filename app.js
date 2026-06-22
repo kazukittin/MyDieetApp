@@ -36,6 +36,9 @@ const foodPresetList = document.querySelector("#food-preset-list");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
+const weightModal = document.querySelector("#weight-modal");
+const openWeightModalButtons = document.querySelectorAll("[data-open-weight-modal]");
+const closeWeightModalButton = document.querySelector("#close-weight-modal");
 const profileStorageKey = "my-diet-notebook:profile:v2";
 const exercisePresetStorageKey = "my-diet-notebook:exercise-presets:v2";
 const cloudTable = "diet_user_data";
@@ -148,10 +151,13 @@ form.addEventListener("submit", (event) => {
   saveEntries();
   render();
   setSaveFeedback(scope, "success", getSaveSuccessMessage(scope));
+  if (scope === "weight") {
+    window.setTimeout(closeWeightModal, 350);
+  }
 });
 
 dateInput.addEventListener("change", () => {
-  fillFormForDate(dateInput.value);
+  fillWeightFieldsForDate(dateInput.value);
 });
 
 clearTodayButton.addEventListener("click", () => {
@@ -258,6 +264,14 @@ logoutButton.addEventListener("click", async () => {
   await supabaseClient.auth.signOut();
 });
 
+openWeightModalButtons.forEach((button) => {
+  button.addEventListener("click", openWeightModal);
+});
+closeWeightModalButton.addEventListener("click", closeWeightModal);
+weightModal.addEventListener("click", (event) => {
+  if (event.target === weightModal) closeWeightModal();
+});
+
 openSettingsButton.addEventListener("click", openSettings);
 pageButtons.forEach((button) => {
   button.addEventListener("click", () => switchPage(button.dataset.pageTarget));
@@ -286,6 +300,10 @@ settingsScreen.addEventListener("click", (event) => {
   if (event.target === settingsScreen) closeSettings();
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !weightModal.hidden) {
+    closeWeightModal();
+    return;
+  }
   if (event.key === "Escape" && !settingsScreen.hidden) closeSettings();
 });
 
@@ -504,6 +522,29 @@ function openSettings() {
 
 function closeSettings() {
   settingsScreen.hidden = true;
+}
+
+function openWeightModal() {
+  const selectedDate = dateInput.value || isoToday;
+  dateInput.value = selectedDate;
+  fillWeightFieldsForDate(selectedDate);
+  setSaveFeedback("weight", "", "朝か夜の体重を入力して保存できます。");
+  weightModal.hidden = false;
+  document.body.classList.add("modal-open");
+  closeWeightModalButton.focus();
+}
+
+function closeWeightModal() {
+  weightModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function fillWeightFieldsForDate(date) {
+  const entry = entries.find((item) => item.date === date);
+  document.querySelector("#weight-morning").value = entry?.weightMorning
+    ?? (entry && (entry.weightNight === null || entry.weightNight === undefined) ? entry.weight ?? "" : "");
+  document.querySelector("#weight-night").value = entry?.weightNight ?? "";
+  document.querySelector("#sleep").value = entry?.sleep ?? "";
 }
 
 function switchPage(pageName) {

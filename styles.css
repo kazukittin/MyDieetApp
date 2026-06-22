@@ -91,6 +91,65 @@ button {
   color: #1d5a3c;
 }
 
+.page-nav .weight-quick-button {
+  margin-left: auto;
+  background: var(--green);
+  color: white;
+}
+
+.page-nav .weight-quick-button:hover {
+  background: #246b48;
+  color: white;
+}
+
+.modal-open {
+  overflow: hidden;
+}
+
+.record-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(31, 41, 51, 0.48);
+  backdrop-filter: blur(10px);
+}
+
+.record-modal[hidden] {
+  display: none;
+}
+
+.record-modal-card {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 28px 80px rgba(20, 28, 38, 0.28);
+  padding: clamp(20px, 4vw, 30px);
+}
+
+.record-modal-card .primary-button {
+  width: 100%;
+}
+
+.modal-date-field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.modal-date-field span {
+  font-weight: 800;
+}
+
+.modal-date-field input {
+  width: 100%;
+}
+
 .app-page {
   display: none;
 }
@@ -518,6 +577,22 @@ h2 {
 .chart-panel,
 .history-panel {
   margin-top: 0;
+}
+
+.weight-log-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.weight-log-panel h2 {
+  margin: 4px 0 8px;
+}
+
+.weight-log-panel > p:not(.section-kicker) {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
 .exercise-log-panel,

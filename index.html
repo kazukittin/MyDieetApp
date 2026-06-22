@@ -150,6 +150,7 @@
         <button class="tab-button" type="button" data-page-target="weight">体重推移</button>
         <button class="tab-button" type="button" data-page-target="exercise">運動記録</button>
         <button class="tab-button" type="button" data-page-target="food">食事記録</button>
+        <button class="tab-button weight-quick-button" type="button" data-open-weight-modal>＋ 体重を記録</button>
         <button id="open-settings" class="tab-button" type="button">設定</button>
       </nav>
 
@@ -293,29 +294,10 @@
             </section>
 
             <section class="panel weight-log-panel">
-              <div class="panel-heading">
-                <div>
-                  <p class="section-kicker">Weight log</p>
-                  <h2>朝・夜の体重と睡眠を記録</h2>
-                </div>
-                <input type="date" id="entry-date" name="date" required>
-              </div>
-              <div class="field-row weight-log-grid">
-                <label class="field-card">
-                  <span>朝の体重 kg</span>
-                  <input type="number" id="weight-morning" name="weightMorning" min="20" max="250" step="0.1" placeholder="62.4">
-                </label>
-                <label class="field-card">
-                  <span>夜の体重 kg</span>
-                  <input type="number" id="weight-night" name="weightNight" min="20" max="250" step="0.1" placeholder="62.8">
-                </label>
-                <label class="field-card">
-                  <span>睡眠 時間</span>
-                  <input type="number" id="sleep" name="sleep" min="0" max="24" step="0.5" placeholder="7">
-                </label>
-              </div>
-              <button class="primary-button" type="submit" data-save-scope="weight">体重を保存</button>
-              <p id="weight-save-feedback" class="save-feedback" role="status" aria-live="polite">朝か夜の体重を入力して保存できます。</p>
+              <p class="section-kicker">Weight log</p>
+              <h2>朝・夜の体重と睡眠を記録</h2>
+              <p>体重記録はどの画面からでも開けます。</p>
+              <button class="primary-button" type="button" data-open-weight-modal>体重記録を開く</button>
             </section>
           </div>
 
@@ -576,6 +558,37 @@
             </section>
           </section>
         </section>
+        <div id="weight-modal" class="record-modal" hidden>
+          <section class="record-modal-card" role="dialog" aria-modal="true" aria-labelledby="weight-modal-title">
+            <div class="settings-header">
+              <div>
+                <p class="section-kicker">Weight log</p>
+                <h2 id="weight-modal-title">体重を記録</h2>
+              </div>
+              <button id="close-weight-modal" class="ghost-button" type="button" aria-label="体重記録を閉じる">閉じる</button>
+            </div>
+            <label class="modal-date-field">
+              <span>記録日</span>
+              <input type="date" id="entry-date" name="date" required>
+            </label>
+            <div class="field-row weight-log-grid">
+              <label class="field-card">
+                <span>朝の体重 kg</span>
+                <input type="number" id="weight-morning" name="weightMorning" min="20" max="250" step="0.1" placeholder="62.4">
+              </label>
+              <label class="field-card">
+                <span>夜の体重 kg</span>
+                <input type="number" id="weight-night" name="weightNight" min="20" max="250" step="0.1" placeholder="62.8">
+              </label>
+              <label class="field-card">
+                <span>睡眠 時間</span>
+                <input type="number" id="sleep" name="sleep" min="0" max="24" step="0.5" placeholder="7">
+              </label>
+            </div>
+            <button class="primary-button" type="submit" data-save-scope="weight">体重を保存</button>
+            <p id="weight-save-feedback" class="save-feedback" role="status" aria-live="polite">朝か夜の体重を入力して保存できます。</p>
+          </section>
+        </div>
       </form>
     </main>
 
