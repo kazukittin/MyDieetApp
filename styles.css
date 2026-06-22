@@ -821,7 +821,7 @@ h2 {
   background: transparent;
   color: inherit;
   cursor: pointer;
-  padding: 12px 48px 12px 12px;
+  padding: 12px 82px 12px 12px;
   text-align: left;
 }
 
@@ -841,17 +841,38 @@ h2 {
   line-height: 1.35;
 }
 
-.preset-delete-button {
+.preset-card-actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  gap: 2px;
+}
+
+.preset-card-actions button {
   border: 0;
   background: transparent;
-  color: var(--coral);
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 800;
   padding: 5px;
+}
+
+.preset-card-actions button[data-edit-preset-id],
+.preset-card-actions button[data-edit-food-preset] {
+  color: var(--blue);
+}
+
+.preset-card-actions button[data-delete-preset-id],
+.preset-card-actions button[data-delete-food-preset] {
+  color: var(--coral);
+}
+
+.preset-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
 .preset-apply-button:hover {

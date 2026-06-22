@@ -449,7 +449,10 @@
                   <span>プリセット名</span>
                   <input id="exercise-preset-name" type="text" maxlength="40" placeholder="例: 朝のウォーキング">
                 </label>
-                <button id="save-exercise-preset" class="ghost-button" type="button">現在の内容をプリセットに追加</button>
+                <div class="preset-edit-actions">
+                  <button id="save-exercise-preset" class="ghost-button" type="button">現在の内容をプリセットに追加</button>
+                  <button id="cancel-exercise-preset-edit" class="text-button" type="button" hidden>編集をキャンセル</button>
+                </div>
               </div>
               <button class="primary-button" type="submit" data-save-scope="exercise">運動を保存</button>
               <p id="exercise-save-feedback" class="save-feedback" role="status" aria-live="polite">今日できた運動を選んで保存できます。</p>
@@ -578,7 +581,10 @@
                   <span>プリセット名</span>
                   <input id="food-preset-name" type="text" maxlength="40" placeholder="例: 平日の朝食">
                 </label>
-                <button id="save-food-preset" class="ghost-button" type="button">現在の内容をプリセットに追加</button>
+                <div class="preset-edit-actions">
+                  <button id="save-food-preset" class="ghost-button" type="button">現在の内容をプリセットに追加</button>
+                  <button id="cancel-food-preset-edit" class="text-button" type="button" hidden>編集をキャンセル</button>
+                </div>
               </div>
 
               <button class="primary-button" type="submit" data-save-scope="food">食事を保存</button>

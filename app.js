@@ -41,10 +41,12 @@ const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
 const saveExercisePresetButton = document.querySelector("#save-exercise-preset");
 const exercisePresetNameInput = document.querySelector("#exercise-preset-name");
+const cancelExercisePresetEditButton = document.querySelector("#cancel-exercise-preset-edit");
 const exercisePresetList = document.querySelector("#exercise-preset-list");
 const foodPresetList = document.querySelector("#food-preset-list");
 const saveFoodPresetButton = document.querySelector("#save-food-preset");
 const foodPresetNameInput = document.querySelector("#food-preset-name");
+const cancelFoodPresetEditButton = document.querySelector("#cancel-food-preset-edit");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
@@ -102,6 +104,8 @@ let lastDeletion = null;
 let undoTimer = null;
 const dirtyEntryDates = new Set();
 let settingsDirty = false;
+let editingExercisePresetId = null;
+let editingFoodPresetId = null;
 
 [weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
   input.value = isoToday;
@@ -418,9 +422,11 @@ rangeButtons.forEach((button) => {
 if (saveExercisePresetButton) {
   saveExercisePresetButton.addEventListener("click", saveCurrentExerciseAsPreset);
 }
+cancelExercisePresetEditButton.addEventListener("click", cancelExercisePresetEdit);
 if (saveFoodPresetButton) {
   saveFoodPresetButton.addEventListener("click", saveCurrentFoodAsPreset);
 }
+cancelFoodPresetEditButton.addEventListener("click", cancelFoodPresetEdit);
 document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
   input.addEventListener("input", updateIntakeCaloriesTotal);
 });
@@ -1730,7 +1736,10 @@ function renderExercisePresets() {
           <strong>${getExerciseTypeLabel(preset.type)}</strong>
           <small>${preset.minutes}分 / ${preset.burnCalories}kcal / ${getExerciseIntensityLabel(preset.intensity)}</small>
         </button>
-        <button class="preset-delete-button" type="button" data-delete-preset-id="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を削除">削除</button>
+        <div class="preset-card-actions">
+          <button type="button" data-edit-preset-id="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を編集">編集</button>
+          <button type="button" data-delete-preset-id="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を削除">削除</button>
+        </div>
       </article>
     `)
     .join("");
@@ -1746,11 +1755,18 @@ function renderExercisePresets() {
   exercisePresetList.querySelectorAll("[data-delete-preset-id]").forEach((button) => {
     button.addEventListener("click", () => {
       exercisePresets = exercisePresets.filter((item) => item.id !== button.dataset.deletePresetId);
+      if (editingExercisePresetId === button.dataset.deletePresetId) cancelExercisePresetEdit();
       saveExercisePresets();
       touchSettings();
       syncExercisePresets();
       renderExercisePresets();
       setSaveFeedback("exercise", "success", "プリセットを削除しました。");
+    });
+  });
+  exercisePresetList.querySelectorAll("[data-edit-preset-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = exercisePresets.find((item) => item.id === button.dataset.editPresetId);
+      beginExercisePresetEdit(preset);
     });
   });
 }
@@ -1786,7 +1802,7 @@ function saveCurrentExerciseAsPreset() {
   }
 
   const preset = normalizeExercisePreset({
-    id: createId(),
+    id: editingExercisePresetId || createId(),
     name,
     type: document.querySelector("#exercise-type")?.value || "",
     minutes: document.querySelector("#exercise-minutes")?.value || 0,
@@ -1798,13 +1814,35 @@ function saveCurrentExerciseAsPreset() {
     note: document.querySelector("#exercise-note")?.value.trim() || "",
   });
 
-  exercisePresets.push(preset);
+  if (editingExercisePresetId) {
+    exercisePresets = exercisePresets.map((item) => item.id === editingExercisePresetId ? preset : item);
+  } else {
+    exercisePresets.push(preset);
+  }
   saveExercisePresets();
   touchSettings();
   syncExercisePresets();
-  exercisePresetNameInput.value = "";
+  const wasEditing = Boolean(editingExercisePresetId);
+  cancelExercisePresetEdit();
   renderExercisePresets();
-  setSaveFeedback("exercise", "success", `${preset.name}をプリセットに追加しました。`);
+  setSaveFeedback("exercise", "success", `${preset.name}をプリセット${wasEditing ? "更新" : "に追加"}しました。`);
+}
+
+function beginExercisePresetEdit(preset) {
+  if (!preset) return;
+  editingExercisePresetId = preset.id;
+  applyExercisePreset(preset);
+  exercisePresetNameInput.value = preset.name;
+  saveExercisePresetButton.textContent = "プリセットを更新";
+  cancelExercisePresetEditButton.hidden = false;
+  exercisePresetNameInput.focus();
+}
+
+function cancelExercisePresetEdit() {
+  editingExercisePresetId = null;
+  exercisePresetNameInput.value = "";
+  saveExercisePresetButton.textContent = "現在の内容をプリセットに追加";
+  cancelExercisePresetEditButton.hidden = true;
 }
 
 function syncExercisePresets() {
@@ -1929,7 +1967,10 @@ function renderFoodPresets() {
           <strong>${getMealLogLabel(preset.meals)}</strong>
           <small>${getMealCaloriesTotal(preset.mealCalories) ?? 0}kcal</small>
         </button>
-        <button class="preset-delete-button" type="button" data-delete-food-preset="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を削除">削除</button>
+        <div class="preset-card-actions">
+          <button type="button" data-edit-food-preset="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を編集">編集</button>
+          <button type="button" data-delete-food-preset="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を削除">削除</button>
+        </div>
       </article>
     `)
     .join("");
@@ -1944,10 +1985,17 @@ function renderFoodPresets() {
   foodPresetList.querySelectorAll("[data-delete-food-preset]").forEach((button) => {
     button.addEventListener("click", () => {
       foodPresets = foodPresets.filter((item) => item.id !== button.dataset.deleteFoodPreset);
+      if (editingFoodPresetId === button.dataset.deleteFoodPreset) cancelFoodPresetEdit();
       saveFoodPresets();
       touchSettings();
       syncExercisePresets();
       renderFoodPresets();
+    });
+  });
+  foodPresetList.querySelectorAll("[data-edit-food-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = foodPresets.find((item) => item.id === button.dataset.editFoodPreset);
+      beginFoodPresetEdit(preset);
     });
   });
 }
@@ -1977,7 +2025,7 @@ function saveCurrentFoodAsPreset() {
   }
   const formData = new FormData(foodForm);
   const preset = normalizeFoodPreset({
-    id: createId(),
+    id: editingFoodPresetId || createId(),
     name,
     mealCalories: getMealCaloriesFromForm(formData),
     meals: formData.getAll("meals"),
@@ -1985,13 +2033,35 @@ function saveCurrentFoodAsPreset() {
     mood: formData.get("mood"),
     note: String(formData.get("note") || "").trim(),
   });
-  foodPresets.push(preset);
+  if (editingFoodPresetId) {
+    foodPresets = foodPresets.map((item) => item.id === editingFoodPresetId ? preset : item);
+  } else {
+    foodPresets.push(preset);
+  }
   saveFoodPresets();
   touchSettings();
   syncExercisePresets();
-  foodPresetNameInput.value = "";
+  const wasEditing = Boolean(editingFoodPresetId);
+  cancelFoodPresetEdit();
   renderFoodPresets();
-  setSaveFeedback("food", "success", `${preset.name}をプリセットに追加しました。`);
+  setSaveFeedback("food", "success", `${preset.name}をプリセット${wasEditing ? "更新" : "に追加"}しました。`);
+}
+
+function beginFoodPresetEdit(preset) {
+  if (!preset) return;
+  editingFoodPresetId = preset.id;
+  applyFoodPreset(preset);
+  foodPresetNameInput.value = preset.name;
+  saveFoodPresetButton.textContent = "プリセットを更新";
+  cancelFoodPresetEditButton.hidden = false;
+  foodPresetNameInput.focus();
+}
+
+function cancelFoodPresetEdit() {
+  editingFoodPresetId = null;
+  foodPresetNameInput.value = "";
+  saveFoodPresetButton.textContent = "現在の内容をプリセットに追加";
+  cancelFoodPresetEditButton.hidden = true;
 }
 
 function updateIntakeCaloriesTotal() {
