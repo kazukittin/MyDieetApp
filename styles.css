@@ -244,8 +244,159 @@ button {
 
 .app-tabs {
   width: 100%;
-  justify-content: flex-start;
+  justify-content: flex-end;
   margin-left: 0;
+}
+
+.unified-section {
+  margin-bottom: 18px;
+}
+
+.carousel-heading {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.carousel-heading > div {
+  text-align: center;
+}
+
+.carousel-heading h2 {
+  margin: 2px 0;
+}
+
+.carousel-heading span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.carousel-heading > button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--green);
+  cursor: pointer;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.carousel-heading > button:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.summary-carousel-slide > :is(.summary-grid, .weight-summary-grid, .exercise-summary-grid, .food-summary-grid) {
+  margin: 0;
+}
+
+.unified-support {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+.unified-support > .panel {
+  margin: 0;
+}
+
+.streak-badge {
+  display: grid;
+  align-content: center;
+  min-width: 130px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: #1d5a3c;
+  padding: 16px;
+}
+
+.streak-badge span {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.streak-badge strong {
+  font-size: 1.35rem;
+}
+
+.unified-chart-panel {
+  margin-bottom: 20px;
+}
+
+.chart-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, auto)) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.chart-filter-bar fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.chart-filter-bar legend {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.filter-buttons,
+.filter-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-buttons button,
+.filter-checks label {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.filter-buttons button.is-active,
+.filter-checks label:has(input:checked) {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: #1d5a3c;
+}
+
+.filter-checks input {
+  margin-right: 5px;
+}
+
+.unified-chart-source {
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.unified-chart-source > .panel-heading,
+.unified-chart-source .range-tabs {
+  display: none;
+}
+
+.history-carousel-slide > .panel {
+  margin: 0;
 }
 
 .auth-screen {
@@ -701,17 +852,6 @@ h2 {
 .compact-account-form label {
   display: grid;
   gap: 6px;
-}
-
-.weekly-report-panel p {
-  margin: 8px 0 0;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.weekly-report-panel #record-streak {
-  color: var(--green);
-  white-space: nowrap;
 }
 
 .history-actions {
@@ -1692,6 +1832,15 @@ legend {
   .preset-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .unified-support,
+  .chart-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .streak-badge {
+    min-width: 0;
   }
 
   .inline-date-field {

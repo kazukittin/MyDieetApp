@@ -47,9 +47,16 @@ const foodPresetList = document.querySelector("#food-preset-list");
 const saveFoodPresetButton = document.querySelector("#save-food-preset");
 const foodPresetNameInput = document.querySelector("#food-preset-name");
 const cancelFoodPresetEditButton = document.querySelector("#cancel-food-preset-edit");
-const pageButtons = document.querySelectorAll("[data-page-target]");
-const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
+const summaryCarouselTitle = document.querySelector("#summary-carousel-title");
+const summaryCarouselPosition = document.querySelector("#summary-carousel-position");
+const summaryCarouselMount = document.querySelector("#summary-carousel-mount");
+const historyCarouselTitle = document.querySelector("#history-carousel-title");
+const historyCarouselPosition = document.querySelector("#history-carousel-position");
+const historyCarouselMount = document.querySelector("#history-carousel-mount");
+const unifiedChartMount = document.querySelector("#unified-chart-mount");
+const balanceFilterGroup = document.querySelector("#balance-filter-group");
+const weightFilterGroup = document.querySelector("#weight-filter-group");
 const weightModal = document.querySelector("#weight-modal");
 const openWeightModalButtons = document.querySelectorAll("[data-open-weight-modal]");
 const closeWeightModalButton = document.querySelector("#close-weight-modal");
@@ -91,6 +98,11 @@ let exercisePresets = getDefaultExercisePresets();
 let foodPresets = getDefaultFoodPresets();
 let settingsUpdatedAt = new Date(0).toISOString();
 let comboChartRangeDays = 31;
+let summaryCarouselIndex = 0;
+let historyCarouselIndex = 0;
+let chartView = "balance";
+const balanceSeries = new Set(["intake", "burn", "weight"]);
+const weightSeries = new Set(["morning", "night", "average", "goal"]);
 let lastDeletion = null;
 let undoTimer = null;
 const dirtyEntryDates = new Set();
@@ -105,6 +117,7 @@ const exerciseModal = createEntryModal(exerciseForm, "exercise-modal", "運動�
 const foodModal = createEntryModal(foodForm, "food-modal", "食事記録を閉じる");
 setupRecordModalNavigation(exerciseForm, "weight", "運動", "food");
 setupRecordModalNavigation(foodForm, "exercise", "食事", "weight");
+setupUnifiedScreen();
 if (document.querySelector("#today-label")) {
   document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 }
@@ -400,8 +413,36 @@ document.addEventListener("click", (event) => {
 undoDeleteButton.addEventListener("click", undoLastDeletion);
 
 openSettingsButton.addEventListener("click", openSettings);
-pageButtons.forEach((button) => {
-  button.addEventListener("click", () => switchPage(button.dataset.pageTarget));
+document.querySelector("#summary-prev").addEventListener("click", () => moveSummaryCarousel(-1));
+document.querySelector("#summary-next").addEventListener("click", () => moveSummaryCarousel(1));
+document.querySelector("#history-prev").addEventListener("click", () => moveHistoryCarousel(-1));
+document.querySelector("#history-next").addEventListener("click", () => moveHistoryCarousel(1));
+document.querySelectorAll("[data-chart-view]").forEach((button) => {
+  button.addEventListener("click", () => {
+    chartView = button.dataset.chartView;
+    document.querySelectorAll("[data-chart-view]").forEach((item) => item.classList.toggle("is-active", item === button));
+    updateChartView();
+  });
+});
+document.querySelectorAll("[data-unified-range]").forEach((button) => {
+  button.addEventListener("click", () => {
+    comboChartRangeDays = Number(button.dataset.unifiedRange);
+    document.querySelectorAll("[data-unified-range]").forEach((item) => item.classList.toggle("is-active", item === button));
+    renderCalorieComboChart();
+    renderWeightChart();
+  });
+});
+document.querySelectorAll("[data-balance-series]").forEach((input) => {
+  input.addEventListener("change", () => {
+    toggleSeries(balanceSeries, input.dataset.balanceSeries, input.checked);
+    renderCalorieComboChart();
+  });
+});
+document.querySelectorAll("[data-weight-series]").forEach((input) => {
+  input.addEventListener("change", () => {
+    toggleSeries(weightSeries, input.dataset.weightSeries, input.checked);
+    renderWeightChart();
+  });
 });
 rangeButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -774,6 +815,116 @@ function closeSettings() {
   settingsScreen.hidden = true;
 }
 
+function setupUnifiedScreen() {
+  document.body.append(weightModal);
+  const summarySources = [
+    { label: "概要", element: document.querySelector(".summary-grid") },
+    { label: "体重", element: document.querySelector(".weight-summary-grid") },
+    { label: "運動", element: document.querySelector(".exercise-summary-grid") },
+    { label: "食事", element: document.querySelector(".food-summary-grid") },
+  ];
+  summarySources.forEach(({ label, element }, index) => {
+    const slide = document.createElement("div");
+    slide.className = "carousel-slide summary-carousel-slide";
+    slide.dataset.carouselLabel = label;
+    slide.hidden = index !== 0;
+    slide.append(element);
+    summaryCarouselMount.append(slide);
+  });
+
+  const support = document.querySelector("#unified-support");
+  const insights = document.querySelector(".insights");
+  const dailyStatus = document.querySelector(".daily-status-panel");
+  if (insights) support.append(insights);
+  if (dailyStatus) support.append(dailyStatus);
+  const streak = document.createElement("div");
+  streak.className = "streak-badge";
+  streak.innerHTML = '<span>連続記録</span><strong id="record-streak">0日</strong>';
+  support.append(streak);
+
+  const caloriePanel = document.querySelector(".calorie-panel");
+  const weightChartPanel = document.querySelector(".chart-panel");
+  caloriePanel.classList.add("unified-chart-source");
+  caloriePanel.dataset.chartPanel = "balance";
+  weightChartPanel.classList.add("unified-chart-source");
+  weightChartPanel.dataset.chartPanel = "weight";
+  weightChartPanel.hidden = true;
+  unifiedChartMount.append(caloriePanel, weightChartPanel);
+
+  const allHistory = document.querySelector(".history-panel");
+  const exerciseHistory = document.querySelector(".exercise-history-panel");
+  const foodHistory = document.querySelector(".food-history-panel");
+  const weightHistory = document.createElement("section");
+  weightHistory.className = "panel history-panel";
+  weightHistory.innerHTML = `
+    <div class="panel-heading">
+      <div><p class="section-kicker">Weight history</p><h2>体重履歴</h2></div>
+    </div>
+    <div id="weight-only-history-list" class="history-list"></div>
+  `;
+  [
+    { label: "すべての履歴", element: allHistory },
+    { label: "体重履歴", element: weightHistory },
+    { label: "運動履歴", element: exerciseHistory },
+    { label: "食事履歴", element: foodHistory },
+  ].forEach(({ label, element }, index) => {
+    const slide = document.createElement("div");
+    slide.className = "carousel-slide history-carousel-slide";
+    slide.dataset.carouselLabel = label;
+    slide.hidden = index !== 0;
+    slide.append(element);
+    historyCarouselMount.append(slide);
+  });
+
+  document.querySelector("#app-content").hidden = true;
+  updateSummaryCarousel();
+  updateHistoryCarousel();
+  updateChartView();
+}
+
+function moveSummaryCarousel(direction) {
+  summaryCarouselIndex = (summaryCarouselIndex + direction + 4) % 4;
+  updateSummaryCarousel();
+}
+
+function updateSummaryCarousel() {
+  const slides = Array.from(summaryCarouselMount.querySelectorAll(".carousel-slide"));
+  slides.forEach((slide, index) => {
+    slide.hidden = index !== summaryCarouselIndex;
+  });
+  summaryCarouselTitle.textContent = slides[summaryCarouselIndex]?.dataset.carouselLabel || "概要";
+  summaryCarouselPosition.textContent = `${summaryCarouselIndex + 1} / ${slides.length}`;
+}
+
+function moveHistoryCarousel(direction) {
+  historyCarouselIndex = (historyCarouselIndex + direction + 4) % 4;
+  updateHistoryCarousel();
+}
+
+function updateHistoryCarousel() {
+  const slides = Array.from(historyCarouselMount.querySelectorAll(".carousel-slide"));
+  slides.forEach((slide, index) => {
+    slide.hidden = index !== historyCarouselIndex;
+  });
+  historyCarouselTitle.textContent = slides[historyCarouselIndex]?.dataset.carouselLabel || "すべての履歴";
+  historyCarouselPosition.textContent = `${historyCarouselIndex + 1} / ${slides.length}`;
+}
+
+function updateChartView() {
+  document.querySelectorAll("[data-chart-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.chartPanel !== chartView;
+  });
+  balanceFilterGroup.hidden = chartView !== "balance";
+  weightFilterGroup.hidden = chartView !== "weight";
+  if (chartView === "weight") renderWeightChart();
+  else renderCalorieComboChart();
+}
+
+function toggleSeries(seriesSet, key, enabled) {
+  if (enabled) seriesSet.add(key);
+  else seriesSet.delete(key);
+}
+
 function openWeightModal() {
   const selectedDate = weightDateInput.value || isoToday;
   weightDateInput.value = selectedDate;
@@ -973,16 +1124,6 @@ function fillWeightFieldsForDate(date) {
     ?? (entry && (entry.weightNight === null || entry.weightNight === undefined) ? entry.weight ?? "" : "");
   document.querySelector("#weight-night").value = entry?.weightNight ?? "";
   document.querySelector("#sleep").value = entry?.sleep ?? "";
-}
-
-function switchPage(pageName) {
-  appPages.forEach((page) => {
-    page.classList.toggle("is-active", page.dataset.page === pageName);
-  });
-  document.querySelectorAll(".tab-button[data-page-target]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.pageTarget === pageName);
-  });
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function mergeEntries(localEntries, serverEntries) {
@@ -1387,6 +1528,7 @@ function render() {
   renderFoodPage();
   renderWeightChart();
   renderHistory();
+  renderWeightOnlyHistory();
 }
 
 function renderSummary() {
@@ -1420,27 +1562,8 @@ function renderSummary() {
 
 function renderWeeklyReport(weekEntries) {
   const streak = getStreak();
-  document.querySelector("#record-streak").textContent = `${streak}日連続`;
-  if (!weekEntries.length) {
-    document.querySelector("#weekly-report-text").textContent = "記録を続けると、今週の傾向が表示されます。";
-    return;
-  }
-  const weightEntries = weekEntries.filter(hasWeightEntry).slice().sort((a, b) => a.date.localeCompare(b.date));
-  const weightChange = weightEntries.length >= 2
-    ? getPrimaryWeight(weightEntries.at(-1)) - getPrimaryWeight(weightEntries[0])
-    : null;
-  const exerciseMinutes = weekEntries.reduce((sum, entry) => sum + (numberOrNull(entry.exerciseMinutes) || 0), 0);
-  const calorieEntries = weekEntries.filter((entry) => numberOrNull(entry.intakeCalories) !== null);
-  const averageCalories = calorieEntries.length
-    ? Math.round(calorieEntries.reduce((sum, entry) => sum + entry.intakeCalories, 0) / calorieEntries.length)
-    : null;
-  const parts = [
-    `${weekEntries.length}日記録`,
-    weightChange === null ? null : `体重${weightChange >= 0 ? "+" : ""}${weightChange.toFixed(1)}kg`,
-    exerciseMinutes ? `運動${Math.round(exerciseMinutes)}分` : null,
-    averageCalories ? `平均${averageCalories}kcal` : null,
-  ].filter(Boolean);
-  document.querySelector("#weekly-report-text").textContent = parts.join("・");
+  const element = document.querySelector("#record-streak");
+  if (element) element.textContent = `${streak}日`;
 }
 
 function renderDailyStatus(entry) {
@@ -1482,14 +1605,18 @@ function renderCalorieComboChart() {
   const svg = document.querySelector("#calorie-combo-chart");
   const empty = document.querySelector("#calorie-chart-empty");
   const rangePoints = entries
-    .filter((item) => numberOrNull(item.intakeCalories) !== null || numberOrNull(item.burnCalories) !== null || hasWeightEntry(item))
+    .filter((item) => (
+      (balanceSeries.has("intake") && numberOrNull(item.intakeCalories) !== null)
+      || (balanceSeries.has("burn") && numberOrNull(item.burnCalories) !== null)
+      || (balanceSeries.has("weight") && hasWeightEntry(item))
+    ))
     .filter((item) => isWithinRange(item.date, comboChartRangeDays))
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date));
   const points = sampleChartPoints(rangePoints, 120);
 
   svg.innerHTML = '<title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>';
-  if (!points.length) {
+  if (!points.length || !balanceSeries.size) {
     svg.hidden = true;
     empty.hidden = false;
     return;
@@ -1501,8 +1628,11 @@ function renderCalorieComboChart() {
   const width = 720;
   const height = 260;
   const pad = { top: 24, right: 58, bottom: 42, left: 58 };
-  const calorieValues = points.flatMap((point) => [point.intakeCalories, point.burnCalories]).filter((value) => value !== null);
-  const weightValues = points.map(getPrimaryWeight).filter((value) => value !== null);
+  const calorieValues = points.flatMap((point) => [
+    balanceSeries.has("intake") ? point.intakeCalories : null,
+    balanceSeries.has("burn") ? point.burnCalories : null,
+  ]).filter((value) => value !== null);
+  const weightValues = balanceSeries.has("weight") ? points.map(getPrimaryWeight).filter((value) => value !== null) : [];
   const max = calorieValues.length ? Math.max(500, Math.ceil(Math.max(...calorieValues) / 250) * 250) : 500;
   const minWeight = weightValues.length ? Math.floor((Math.min(...weightValues) - 0.5) * 10) / 10 : 0;
   const maxWeight = weightValues.length ? Math.ceil((Math.max(...weightValues) + 0.5) * 10) / 10 : 1;
@@ -1536,34 +1666,34 @@ function renderCalorieComboChart() {
     })
     .filter(Boolean)
     .join(" ");
-  const bars = points.map((point, index) => {
+  const bars = balanceSeries.has("burn") ? points.map((point, index) => {
     const value = point.burnCalories || 0;
     const barHeight = Math.max(0, pad.top + innerHeight - y(value));
     const x = xCenter(index) - barWidth / 2;
     return `<rect class="calorie-burn-bar" x="${x.toFixed(1)}" y="${y(value).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" rx="6"><title>${formatDateLabel(point.date)} 消費 ${Math.round(value)}kcal</title></rect>`;
-  }).join("");
-  const dots = points
+  }).join("") : "";
+  const dots = balanceSeries.has("intake") ? points
     .map((point, index) => {
       const intake = numberOrNull(point.intakeCalories);
       return intake === null ? "" : `<circle class="calorie-intake-dot" cx="${xCenter(index).toFixed(1)}" cy="${y(intake).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 摂取 ${Math.round(intake)}kcal</title></circle>`;
     })
-    .join("");
-  const weightDots = points
+    .join("") : "";
+  const weightDots = balanceSeries.has("weight") ? points
     .map((point, index) => {
       const weight = getPrimaryWeight(point);
       return weight === null ? "" : `<circle class="combo-weight-dot" cx="${xCenter(index).toFixed(1)}" cy="${yWeight(weight).toFixed(1)}" r="4"><title>${formatDateLabel(point.date)} 体重 ${weight.toFixed(1)}kg</title></circle>`;
     })
-    .join("");
+    .join("") : "";
   const grid = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
     const value = Math.round(max * (1 - ratio));
     const yy = pad.top + innerHeight * ratio;
     return `<g><line class="chart-grid" x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}"></line><text class="chart-label" x="10" y="${yy + 4}">${value}</text></g>`;
   }).join("");
-  const weightAxis = [0, 0.5, 1].map((ratio) => {
+  const weightAxis = balanceSeries.has("weight") ? [0, 0.5, 1].map((ratio) => {
     const value = maxWeight - weightRange * ratio;
     const yy = pad.top + innerHeight * ratio;
     return `<text class="chart-label combo-weight-axis" x="${width - 10}" y="${yy + 4}" text-anchor="end">${value.toFixed(1)}kg</text>`;
-  }).join("");
+  }).join("") : "";
   const labelInterval = Math.max(1, Math.ceil(points.length / 8));
   const labels = points.map((point, index) => {
     if (points.length > 8 && index !== 0 && index !== points.length - 1 && index % labelInterval !== 0) return "";
@@ -1573,9 +1703,9 @@ function renderCalorieComboChart() {
   svg.insertAdjacentHTML("beforeend", `
     ${grid}
     ${bars}
-    <path class="calorie-intake-line" d="${linePoints}"></path>
+    ${balanceSeries.has("intake") ? `<path class="calorie-intake-line" d="${linePoints}"></path>` : ""}
     ${dots}
-    <path class="combo-weight-line" d="${weightLinePoints}"></path>
+    ${balanceSeries.has("weight") ? `<path class="combo-weight-line" d="${weightLinePoints}"></path>` : ""}
     ${weightDots}
     ${weightAxis}
     ${labels}
@@ -1660,6 +1790,28 @@ function renderHistory() {
         </article>
       `;
     })
+    .join("");
+}
+
+function renderWeightOnlyHistory() {
+  const list = document.querySelector("#weight-only-history-list");
+  if (!list) return;
+  const weightEntries = entries.filter(hasWeightEntry).slice(0, 14);
+  if (!weightEntries.length) {
+    list.innerHTML = '<p class="empty">まだ体重記録がありません。</p>';
+    return;
+  }
+  list.innerHTML = weightEntries
+    .map((entry) => `
+      <article class="history-item">
+        <div class="history-date">${formatDateLabel(entry.date)}</div>
+        <div class="history-detail">${getWeightHistoryLabel(entry)} / ${entry.sleep === null ? "睡眠未入力" : `${entry.sleep}時間睡眠`}</div>
+        <div class="history-actions">
+          <button type="button" data-edit-entry="weight" data-entry-date="${entry.date}">編集</button>
+          <button type="button" data-delete-entry="weight" data-entry-date="${entry.date}">削除</button>
+        </div>
+      </article>
+    `)
     .join("");
 }
 
@@ -2195,14 +2347,17 @@ function getWeightHistoryLabel(entry) {
 function renderWeightChart() {
   const svg = document.querySelector("#weight-chart");
   const empty = document.querySelector("#chart-empty");
-  const points = entries
-    .filter(hasWeightEntry)
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-30);
+  const points = sampleChartPoints(
+    entries
+      .filter(hasWeightEntry)
+      .filter((entry) => isWithinRange(entry.date, comboChartRangeDays))
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    120,
+  );
 
   svg.innerHTML = '<title id="weight-chart-title">体重の推移グラフ</title>';
-  if (points.length < 2) {
+  if (points.length < 2 || !weightSeries.size) {
     svg.hidden = true;
     empty.hidden = false;
     return;
@@ -2215,10 +2370,19 @@ function renderWeightChart() {
   const height = 280;
   const pad = { top: 22, right: 26, bottom: 42, left: 52 };
   const weights = points
-    .flatMap((point) => [getPrimaryWeight(point), numberOrNull(point.weightMorning), numberOrNull(point.weightNight)])
+    .flatMap((point) => [
+      weightSeries.has("average") ? getPrimaryWeight(point) : null,
+      weightSeries.has("morning") ? numberOrNull(point.weightMorning) : null,
+      weightSeries.has("night") ? numberOrNull(point.weightNight) : null,
+    ])
     .filter((weight) => weight !== null);
   const goalWeight = numberOrNull(profile.goalWeight);
-  if (goalWeight !== null) weights.push(goalWeight);
+  if (goalWeight !== null && weightSeries.has("goal")) weights.push(goalWeight);
+  if (!weights.length) {
+    svg.hidden = true;
+    empty.hidden = false;
+    return;
+  }
   const min = Math.floor(Math.min(...weights) - 0.5);
   const max = Math.ceil(Math.max(...weights) + 0.5);
   const range = Math.max(1, max - min);
@@ -2227,7 +2391,6 @@ function renderWeightChart() {
   const y = (weight) => pad.top + ((max - weight) / range) * (height - pad.top - pad.bottom);
   const morningPath = buildWeightPath(points, x, y, (point) => numberOrNull(point.weightMorning));
   const nightPath = buildWeightPath(points, x, y, (point) => numberOrNull(point.weightNight));
-  const fallbackPath = !morningPath && !nightPath ? buildWeightPath(points, x, y, getPrimaryWeight) : "";
   const averagePoints = points.map((point, index) => ({
     date: point.date,
     weight: averageWeight(points.slice(Math.max(0, index - 6), index + 1)),
@@ -2242,10 +2405,9 @@ function renderWeightChart() {
     .filter((value, index, array) => array.indexOf(value) === index)
     .map((index) => `<text class="chart-label" x="${x(index)}" y="${height - 12}" text-anchor="middle">${formatShortDate(points[index].date)}</text>`)
     .join("");
-  const morningDots = buildWeightDots(points, x, y, (point) => numberOrNull(point.weightMorning), "chart-morning-dot", "朝");
-  const nightDots = buildWeightDots(points, x, y, (point) => numberOrNull(point.weightNight), "chart-night-dot", "夜");
-  const fallbackDots = !morningPath && !nightPath ? buildWeightDots(points, x, y, getPrimaryWeight, "chart-dot", "体重") : "";
-  const goalLine = goalWeight === null ? "" : `
+  const morningDots = weightSeries.has("morning") ? buildWeightDots(points, x, y, (point) => numberOrNull(point.weightMorning), "chart-morning-dot", "朝") : "";
+  const nightDots = weightSeries.has("night") ? buildWeightDots(points, x, y, (point) => numberOrNull(point.weightNight), "chart-night-dot", "夜") : "";
+  const goalLine = goalWeight === null || !weightSeries.has("goal") ? "" : `
     <line class="chart-goal-line" x1="${pad.left}" y1="${y(goalWeight)}" x2="${width - pad.right}" y2="${y(goalWeight)}"></line>
     <text class="chart-goal-label" x="${width - pad.right}" y="${y(goalWeight) - 7}" text-anchor="end">目標 ${goalWeight.toFixed(1)}kg</text>
   `;
@@ -2253,11 +2415,9 @@ function renderWeightChart() {
   svg.insertAdjacentHTML("beforeend", `
     ${grid}
     ${goalLine}
-    <path class="chart-average" d="${averagePath}"></path>
-    ${fallbackPath ? `<path class="chart-line" d="${fallbackPath}"></path>` : ""}
-    ${morningPath ? `<path class="chart-morning-line" d="${morningPath}"></path>` : ""}
-    ${nightPath ? `<path class="chart-night-line" d="${nightPath}"></path>` : ""}
-    ${fallbackDots}
+    ${weightSeries.has("average") ? `<path class="chart-average" d="${averagePath}"></path>` : ""}
+    ${weightSeries.has("morning") && morningPath ? `<path class="chart-morning-line" d="${morningPath}"></path>` : ""}
+    ${weightSeries.has("night") && nightPath ? `<path class="chart-night-line" d="${nightPath}"></path>` : ""}
     ${morningDots}
     ${nightDots}
     ${labels}
