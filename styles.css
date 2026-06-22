@@ -573,26 +573,9 @@ h2 {
   align-items: start;
 }
 
-.weight-log-panel,
 .chart-panel,
 .history-panel {
   margin-top: 0;
-}
-
-.weight-log-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.weight-log-panel h2 {
-  margin: 4px 0 8px;
-}
-
-.weight-log-panel > p:not(.section-kicker) {
-  margin: 0 0 18px;
-  color: var(--muted);
-  line-height: 1.65;
 }
 
 .exercise-log-panel,
