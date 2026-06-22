@@ -1,4 +1,4 @@
-const storageKey = "my-diet-notebook:v1";
+const storageKey = "my-diet-notebook:v2";
 const recordDayBoundaryHour = 3;
 const today = getRecordDayDate(new Date());
 const isoToday = toIsoDate(today);
@@ -8,10 +8,19 @@ const dateInput = document.querySelector("#entry-date");
 const clearTodayButton = document.querySelector("#clear-today");
 const exportButton = document.querySelector("#export-data");
 const syncStatus = document.querySelector("#sync-status");
-const cloudForm = document.querySelector("#cloud-form");
 const syncNowButton = document.querySelector("#sync-now");
-const saveCloudConfigButton = document.querySelector("#save-cloud-config");
 const cloudFeedback = document.querySelector("#cloud-feedback");
+const authScreen = document.querySelector("#auth-screen");
+const authForm = document.querySelector("#auth-form");
+const authEmail = document.querySelector("#auth-email");
+const authPassword = document.querySelector("#auth-password");
+const authSubmit = document.querySelector("#auth-submit");
+const authModeToggle = document.querySelector("#auth-mode-toggle");
+const authFeedback = document.querySelector("#auth-feedback");
+const authConfigHelp = document.querySelector("#auth-config-help");
+const accountEmail = document.querySelector("#account-email");
+const logoutButton = document.querySelector("#logout-button");
+const appShell = document.querySelector(".app-shell");
 const onboarding = document.querySelector("#onboarding");
 const onboardingForm = document.querySelector("#onboarding-form");
 const skipOnboardingButton = document.querySelector("#skip-onboarding");
@@ -27,11 +36,13 @@ const foodPresetList = document.querySelector("#food-preset-list");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
-const canUseServerSync = isPrivateHost(location.hostname);
-const cloudStorageKey = "my-diet-notebook:cloud:v1";
-const profileStorageKey = "my-diet-notebook:profile:v1";
-const exercisePresetStorageKey = "my-diet-notebook:exercise-presets:v1";
-const cloudTable = "diet_app_sync";
+const profileStorageKey = "my-diet-notebook:profile:v2";
+const exercisePresetStorageKey = "my-diet-notebook:exercise-presets:v2";
+const cloudTable = "diet_user_data";
+const appConfig = window.MY_DIET_CONFIG || {};
+const supabaseClient = hasSupabaseConfig() && window.supabase
+  ? window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey)
+  : null;
 const foodHabitValues = ["water", "protein", "vegetables", "no_snack", "slow_eating"];
 const exerciseHabitValues = ["walk", "stretch", "strength"];
 const defaultExercisePresets = [
@@ -50,33 +61,25 @@ const foodPresets = [
   { meal: "snack", label: "間食控えめ", calories: 150, habits: ["no_snack"], note: "間食は軽めにする。" },
 ];
 
-let entries = loadEntries();
-let cloudConfig = loadCloudConfig();
-let profile = loadProfile();
-let exercisePresets = loadExercisePresets();
+let activeUser = null;
+let authMode = "login";
+let entries = [];
+let profile = {};
+let exercisePresets = getDefaultExercisePresets();
 let comboChartRangeDays = 31;
-
-purgeLegacySampleData();
 
 dateInput.value = isoToday;
 if (document.querySelector("#today-label")) {
   document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 }
-if (syncStatus) {
-  syncStatus.textContent = canUseServerSync ? "共有保存" : "端末保存";
-}
-fillCloudForm();
-fillProfileForm();
-showOnboardingIfNeeded();
-syncFromServer();
-syncFromCloud();
+if (syncStatus) syncStatus.textContent = "ログイン待ち";
+initializeAuth();
 
-window.addEventListener("focus", syncFromServer);
+window.addEventListener("focus", () => {
+  if (activeUser) syncFromCloud();
+});
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
-    syncFromServer();
-    syncFromCloud();
-  }
+  if (!document.hidden && activeUser) syncFromCloud();
 });
 
 form.addEventListener("submit", (event) => {
@@ -172,34 +175,54 @@ exportButton.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-cloudForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  setCloudFeedback("loading", "クラウド設定を保存しています...");
-  const formData = new FormData(cloudForm);
-  cloudConfig = {
-    url: normalizeSupabaseUrl(formData.get("cloudUrl")),
-    key: String(formData.get("cloudKey") || "").trim(),
-    id: String(formData.get("cloudId") || "").trim(),
-    password: String(formData.get("cloudPassword") || ""),
-  };
-  localStorage.setItem(cloudStorageKey, JSON.stringify(cloudConfig));
-  withCloudBusy(saveCloudConfigButton, "保存中...", async () => {
-    await syncFromCloud({ pushWhenEmpty: true });
-    setCloudFeedback("success", "クラウド設定を保存して同期しました。");
-  });
-});
-
 syncNowButton.addEventListener("click", (event) => {
   event.preventDefault();
-  if (!hasCloudConfig()) {
-    setCloudFeedback("error", "Supabase URL、キー、同期ID、同期パスワードを入れてください。");
+  if (!activeUser) {
+    setCloudFeedback("error", "ログインしてください。");
     return;
   }
   setCloudFeedback("loading", "クラウドと同期しています...");
   withCloudBusy(syncNowButton, "同期中...", async () => {
-    await syncFromCloud({ pushWhenEmpty: true });
+    await syncFromCloud();
     setCloudFeedback("success", "最新データに同期しました。");
   });
+});
+
+authModeToggle.addEventListener("click", () => {
+  authMode = authMode === "login" ? "signup" : "login";
+  updateAuthMode();
+});
+
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!supabaseClient) {
+    setAuthFeedback("error", "Supabaseの接続設定がありません。");
+    return;
+  }
+
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  setAuthBusy(true);
+  setAuthFeedback("loading", authMode === "signup" ? "アカウントを作成しています..." : "ログインしています...");
+
+  const result = authMode === "signup"
+    ? await supabaseClient.auth.signUp({ email, password })
+    : await supabaseClient.auth.signInWithPassword({ email, password });
+
+  setAuthBusy(false);
+  if (result.error) {
+    setAuthFeedback("error", getAuthErrorMessage(result.error));
+    return;
+  }
+
+  if (authMode === "signup" && !result.data.session) {
+    setAuthFeedback("success", "確認メールを送りました。メール内のリンクを開いてからログインしてください。");
+  }
+});
+
+logoutButton.addEventListener("click", async () => {
+  if (!supabaseClient) return;
+  await supabaseClient.auth.signOut();
 });
 
 openSettingsButton.addEventListener("click", openSettings);
@@ -251,7 +274,7 @@ onboardingForm.addEventListener("submit", (event) => {
     updatedAt: new Date().toISOString(),
   };
 
-  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  saveProfileToDevice();
   if (setupWeight !== null && !entries.some((entry) => entry.date === isoToday)) {
     entries.push({
       date: isoToday,
@@ -284,7 +307,7 @@ onboardingForm.addEventListener("submit", (event) => {
 
 skipOnboardingButton.addEventListener("click", () => {
   profile = { skipped: true, updatedAt: new Date().toISOString() };
-  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  saveProfileToDevice();
   onboarding.hidden = true;
   render();
 });
@@ -303,10 +326,10 @@ profileForm.addEventListener("submit", (event) => {
     skipped: false,
     updatedAt: new Date().toISOString(),
   };
-  localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+  saveProfileToDevice();
   setProfileFeedback("success", "初期設定を保存しました。");
   render();
-  if (hasCloudConfig()) {
+  if (activeUser) {
     pushEntriesToCloud().catch((error) => {
       setProfileFeedback("error", getCloudErrorMessage(error));
     });
@@ -315,7 +338,7 @@ profileForm.addEventListener("submit", (event) => {
 
 function loadEntries() {
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey)) || [];
+    const stored = JSON.parse(localStorage.getItem(getUserStorageKey(storageKey))) || [];
     return Array.isArray(stored) ? stored.map(normalizeEntryWeights) : [];
   } catch {
     return [];
@@ -323,11 +346,9 @@ function loadEntries() {
 }
 
 function saveEntries() {
-  localStorage.setItem(storageKey, JSON.stringify(entries));
-  if (canUseServerSync) {
-    pushEntriesToServer();
-  }
-  if (hasCloudConfig()) {
+  if (!activeUser) return;
+  localStorage.setItem(getUserStorageKey(storageKey), JSON.stringify(entries));
+  if (activeUser) {
     pushEntriesToCloud().catch((error) => {
       setSyncState("同期エラー", getCloudErrorMessage(error));
       setSaveFeedback("all", "error", `端末には保存しました。${getCloudErrorMessage(error)}`);
@@ -335,17 +356,9 @@ function saveEntries() {
   }
 }
 
-function loadCloudConfig() {
-  try {
-    return JSON.parse(localStorage.getItem(cloudStorageKey)) || {};
-  } catch {
-    return {};
-  }
-}
-
 function loadProfile() {
   try {
-    return JSON.parse(localStorage.getItem(profileStorageKey)) || {};
+    return JSON.parse(localStorage.getItem(getUserStorageKey(profileStorageKey))) || {};
   } catch {
     return {};
   }
@@ -353,14 +366,18 @@ function loadProfile() {
 
 function loadExercisePresets() {
   try {
-    const stored = JSON.parse(localStorage.getItem(exercisePresetStorageKey));
+    const stored = JSON.parse(localStorage.getItem(getUserStorageKey(exercisePresetStorageKey)));
     if (!Array.isArray(stored) || stored.length !== defaultExercisePresets.length) {
-      return defaultExercisePresets.map((preset) => ({ ...preset, habits: [...preset.habits] }));
+      return getDefaultExercisePresets();
     }
     return defaultExercisePresets.map((preset, index) => normalizeExercisePreset({ ...preset, ...stored[index], day: preset.day }));
   } catch {
-    return defaultExercisePresets.map((preset) => ({ ...preset, habits: [...preset.habits] }));
+    return getDefaultExercisePresets();
   }
+}
+
+function getDefaultExercisePresets() {
+  return defaultExercisePresets.map((preset) => ({ ...preset, habits: [...preset.habits] }));
 }
 
 function normalizeExercisePreset(preset) {
@@ -376,7 +393,17 @@ function normalizeExercisePreset(preset) {
 }
 
 function saveExercisePresets() {
-  localStorage.setItem(exercisePresetStorageKey, JSON.stringify(exercisePresets));
+  if (!activeUser) return;
+  localStorage.setItem(getUserStorageKey(exercisePresetStorageKey), JSON.stringify(exercisePresets));
+}
+
+function saveProfileToDevice() {
+  if (!activeUser) return;
+  localStorage.setItem(getUserStorageKey(profileStorageKey), JSON.stringify(profile));
+}
+
+function getUserStorageKey(baseKey) {
+  return `${baseKey}:${activeUser?.id || "signed-out"}`;
 }
 
 function purgeLegacySampleData() {
@@ -392,8 +419,8 @@ function purgeLegacySampleData() {
 
   entries = [];
   profile = {};
-  localStorage.removeItem(storageKey);
-  localStorage.removeItem(profileStorageKey);
+  localStorage.removeItem(getUserStorageKey(storageKey));
+  localStorage.removeItem(getUserStorageKey(profileStorageKey));
 }
 
 function normalizeEntryWeights(entry) {
@@ -424,14 +451,6 @@ function showOnboardingIfNeeded() {
   }
 }
 
-function fillCloudForm() {
-  document.querySelector("#cloud-url").value = cloudConfig.url || "";
-  document.querySelector("#cloud-key").value = cloudConfig.key || "";
-  document.querySelector("#cloud-id").value = cloudConfig.id || "";
-  document.querySelector("#cloud-password").value = cloudConfig.password || "";
-  if (hasCloudConfig()) setSyncState("クラウド同期");
-}
-
 function fillProfileForm() {
   document.querySelector("#profile-start-weight").value = profile.startWeight ?? "";
   document.querySelector("#profile-goal-weight").value = profile.goalWeight ?? "";
@@ -441,8 +460,8 @@ function fillProfileForm() {
 }
 
 function openSettings() {
-  fillCloudForm();
   fillProfileForm();
+  accountEmail.textContent = activeUser?.email || "--";
   settingsScreen.hidden = false;
 }
 
@@ -460,55 +479,6 @@ function switchPage(pageName) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function hasCloudConfig() {
-  return Boolean(cloudConfig.url && cloudConfig.key && cloudConfig.id && cloudConfig.password);
-}
-
-async function syncFromServer() {
-  if (!canUseServerSync) {
-    render();
-    return;
-  }
-
-  try {
-    const response = await fetch("/api/entries", { cache: "no-store" });
-    if (!response.ok) throw new Error("Sync failed");
-    const serverEntries = await response.json();
-    if (Array.isArray(serverEntries)) {
-      entries = mergeEntries(entries, serverEntries);
-      purgeLegacySampleData();
-      entries.sort((a, b) => b.date.localeCompare(a.date));
-      localStorage.setItem(storageKey, JSON.stringify(entries));
-      if (entries.length !== serverEntries.length) saveEntries();
-      setSyncState("共有保存");
-    }
-  } catch {
-    setSyncState("端末保存", "端末内に保存中");
-  }
-
-  render();
-}
-
-async function pushEntriesToServer() {
-  try {
-    const response = await fetch("/api/entries", { cache: "no-store" });
-    const serverEntries = response.ok ? await response.json() : [];
-    entries = mergeEntries(entries, Array.isArray(serverEntries) ? serverEntries : []);
-    entries.sort((a, b) => b.date.localeCompare(a.date));
-
-    const saveResponse = await fetch("/api/entries", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(entries),
-    });
-
-    if (!saveResponse.ok) throw new Error("Save failed");
-    setSyncState("共有保存");
-  } catch {
-    setSyncState("端末保存", "端末内に保存中");
-  }
-}
-
 function mergeEntries(localEntries, serverEntries) {
   const byDate = new Map();
   [...serverEntries, ...localEntries].forEach((entry) => {
@@ -522,24 +492,30 @@ function mergeEntries(localEntries, serverEntries) {
   return Array.from(byDate.values());
 }
 
-async function syncFromCloud(options = {}) {
-  if (!hasCloudConfig()) return;
+async function syncFromCloud() {
+  if (!activeUser || !supabaseClient) return;
 
   try {
     setSyncState("同期中");
-    const cloudEntry = await fetchCloudEntry();
-    if (!cloudEntry) {
-      if (options.pushWhenEmpty || entries.length) await pushEntriesToCloud();
-      setSyncState("クラウド同期");
+    const { data: cloudEntry, error } = await supabaseClient
+      .from(cloudTable)
+      .select("payload,updated_at")
+      .eq("user_id", activeUser.id)
+      .maybeSingle();
+    if (error) throw error;
+
+    if (!cloudEntry?.payload) {
+      await pushEntriesToCloud();
+      setSyncState("同期済み");
       return;
     }
 
-    const cloudData = await decryptCloudData(cloudEntry.encrypted_payload);
+    const cloudData = cloudEntry.payload;
     const cloudEntries = Array.isArray(cloudData) ? cloudData : cloudData.entries;
     entries = mergeEntries(entries, Array.isArray(cloudEntries) ? cloudEntries : []);
-    if (!profile.startWeight && cloudData.profile) {
+    if (cloudData.profile) {
       profile = cloudData.profile;
-      localStorage.setItem(profileStorageKey, JSON.stringify(profile));
+      saveProfileToDevice();
     }
     if (Array.isArray(cloudData.exercisePresets)) {
       exercisePresets = defaultExercisePresets.map((preset, index) => (
@@ -549,9 +525,10 @@ async function syncFromCloud(options = {}) {
     }
     purgeLegacySampleData();
     entries.sort((a, b) => b.date.localeCompare(a.date));
-    localStorage.setItem(storageKey, JSON.stringify(entries));
+    localStorage.setItem(getUserStorageKey(storageKey), JSON.stringify(entries));
     await pushEntriesToCloud();
-    setSyncState("クラウド同期");
+    setSyncState("同期済み");
+    fillProfileForm();
     render();
   } catch (error) {
     const message = getCloudErrorMessage(error);
@@ -562,68 +539,134 @@ async function syncFromCloud(options = {}) {
 }
 
 async function pushEntriesToCloud() {
-  if (!hasCloudConfig()) return;
-
-  const encryptedPayload = await encryptCloudData({ entries, profile, exercisePresets });
-  const response = await fetch(`${cloudConfig.url}/rest/v1/${cloudTable}?on_conflict=id`, {
-    method: "POST",
-    headers: cloudHeaders({ prefer: "resolution=merge-duplicates" }),
-    body: JSON.stringify({
-      id: cloudConfig.id,
-      encrypted_payload: encryptedPayload,
+  if (!activeUser || !supabaseClient) return;
+  const { error } = await supabaseClient
+    .from(cloudTable)
+    .upsert({
+      user_id: activeUser.id,
+      payload: { entries, profile, exercisePresets },
       updated_at: new Date().toISOString(),
-    }),
-  });
-
-  if (!response.ok) throw new Error(await getSupabaseError(response, "Cloud save failed"));
-  setSyncState("クラウド同期");
-}
-
-async function fetchCloudEntry() {
-  const response = await fetch(
-    `${cloudConfig.url}/rest/v1/${cloudTable}?id=eq.${encodeURIComponent(cloudConfig.id)}&select=id,encrypted_payload,updated_at`,
-    { headers: cloudHeaders() },
-  );
-  if (!response.ok) throw new Error(await getSupabaseError(response, "Cloud load failed"));
-  const rows = await response.json();
-  return Array.isArray(rows) ? rows[0] : null;
-}
-
-function cloudHeaders(extra = {}) {
-  const headers = {
-    apikey: cloudConfig.key,
-    "Content-Type": "application/json",
-    Prefer: extra.prefer || "return=minimal",
-  };
-  if (!cloudConfig.key.startsWith("sb_publishable_")) {
-    headers.Authorization = `Bearer ${cloudConfig.key}`;
-  }
-  return headers;
-}
-
-async function getSupabaseError(response, fallback) {
-  let detail = "";
-  try {
-    const payload = await response.json();
-    detail = payload.message || payload.error || payload.hint || "";
-  } catch {
-    detail = await response.text().catch(() => "");
-  }
-  return `${fallback}: ${response.status}${detail ? ` ${detail}` : ""}`;
+    }, { onConflict: "user_id" });
+  if (error) throw error;
+  setSyncState("同期済み");
 }
 
 function getCloudErrorMessage(error) {
   const message = String(error?.message || "");
-  if (message.includes("404") || message.includes("Could not find the table")) {
-    return "Supabaseのテーブルが見つかりません";
+  if (message.includes("does not exist") || message.includes("Could not find the table")) {
+    return "Supabaseのdiet_user_dataテーブルが見つかりません。";
   }
-  if (message.includes("401") || message.includes("403") || message.includes("permission denied") || message.includes("row-level security")) {
-    return "SupabaseのキーかRLS設定を確認";
+  if (message.includes("permission denied") || message.includes("row-level security")) {
+    return "データベースのRLS設定を確認してください。";
   }
-  if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
-    return "Supabase URLを確認";
+  return "クラウド同期に失敗しました。";
+}
+
+function hasSupabaseConfig() {
+  return Boolean(
+    appConfig.supabaseUrl
+    && appConfig.supabaseAnonKey
+    && !String(appConfig.supabaseUrl).includes("YOUR_"),
+  );
+}
+
+async function initializeAuth() {
+  appShell.setAttribute("inert", "");
+  if (!supabaseClient) {
+    authConfigHelp.hidden = false;
+    authForm.querySelectorAll("input, button").forEach((element) => {
+      element.disabled = true;
+    });
+    setAuthFeedback("error", "管理者によるSupabase接続設定が必要です。");
+    return;
   }
-  return "Supabase設定を確認";
+
+  const { data } = await supabaseClient.auth.getSession();
+  await applySession(data.session);
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    window.setTimeout(() => applySession(session), 0);
+  });
+}
+
+async function applySession(session) {
+  const nextUser = session?.user || null;
+  if (nextUser?.id === activeUser?.id) return;
+
+  activeUser = nextUser;
+  if (!activeUser) {
+    entries = [];
+    profile = {};
+    exercisePresets = getDefaultExercisePresets();
+    authScreen.hidden = false;
+    onboarding.hidden = true;
+    settingsScreen.hidden = true;
+    accountEmail.textContent = "--";
+    appShell.setAttribute("inert", "");
+    setSyncState("ログイン待ち");
+    render();
+    return;
+  }
+
+  authScreen.hidden = true;
+  appShell.removeAttribute("inert");
+  authPassword.value = "";
+  importLegacyDeviceData();
+  entries = loadEntries();
+  profile = loadProfile();
+  exercisePresets = loadExercisePresets();
+  purgeLegacySampleData();
+  accountEmail.textContent = activeUser.email || activeUser.id;
+  fillProfileForm();
+  showOnboardingIfNeeded();
+  render();
+  await syncFromCloud();
+}
+
+function importLegacyDeviceData() {
+  const migrations = [
+    ["my-diet-notebook:v1", getUserStorageKey(storageKey)],
+    ["my-diet-notebook:profile:v1", getUserStorageKey(profileStorageKey)],
+    ["my-diet-notebook:exercise-presets:v1", getUserStorageKey(exercisePresetStorageKey)],
+  ];
+
+  migrations.forEach(([legacyKey, userKey]) => {
+    const legacyValue = localStorage.getItem(legacyKey);
+    if (legacyValue !== null && localStorage.getItem(userKey) === null) {
+      localStorage.setItem(userKey, legacyValue);
+    }
+    if (legacyValue !== null) localStorage.removeItem(legacyKey);
+  });
+}
+
+function updateAuthMode() {
+  const isSignup = authMode === "signup";
+  authSubmit.textContent = isSignup ? "新規登録" : "ログイン";
+  authModeToggle.textContent = isSignup
+    ? "登録済みの方はこちら（ログイン）"
+    : "初めての方はこちら（新規登録）";
+  authPassword.autocomplete = isSignup ? "new-password" : "current-password";
+  setAuthFeedback("", "");
+}
+
+function setAuthBusy(isBusy) {
+  authSubmit.disabled = isBusy;
+  authModeToggle.disabled = isBusy;
+  authEmail.disabled = isBusy;
+  authPassword.disabled = isBusy;
+}
+
+function setAuthFeedback(type, message) {
+  authFeedback.textContent = message;
+  authFeedback.className = type ? `cloud-feedback is-${type}` : "cloud-feedback";
+}
+
+function getAuthErrorMessage(error) {
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("invalid login credentials")) return "メールアドレスかパスワードが正しくありません。";
+  if (message.includes("email not confirmed")) return "確認メール内のリンクを開いてからログインしてください。";
+  if (message.includes("already registered") || message.includes("already been registered")) return "このメールアドレスは登録済みです。";
+  if (message.includes("password")) return "パスワードは8文字以上で設定してください。";
+  return "認証に失敗しました。入力内容を確認してください。";
 }
 
 function setSyncState(status, message) {
@@ -675,69 +718,6 @@ function getSaveSuccessMessage(scope) {
     all: "記録を保存しました。",
   };
   return labels[scope] || labels.all;
-}
-
-function normalizeSupabaseUrl(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-
-  try {
-    const url = new URL(text.startsWith("http") ? text : `https://${text}`);
-    return url.origin.replace(/\/$/, "");
-  } catch {
-    return text.replace(/\/rest\/v1\/?$/i, "").replace(/\/rest\/?$/i, "").replace(/\/$/, "");
-  }
-}
-
-async function encryptCloudData(value) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const key = await deriveCloudKey();
-  const encoded = new TextEncoder().encode(JSON.stringify(value));
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
-  return `${base64FromBytes(iv)}.${base64FromBytes(new Uint8Array(encrypted))}`;
-}
-
-async function decryptCloudData(payload) {
-  const [ivText, encryptedText] = String(payload || "").split(".");
-  if (!ivText || !encryptedText) return [];
-  const key = await deriveCloudKey();
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: bytesFromBase64(ivText) },
-    key,
-    bytesFromBase64(encryptedText),
-  );
-  return JSON.parse(new TextDecoder().decode(decrypted));
-}
-
-async function deriveCloudKey() {
-  const material = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(cloudConfig.password),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: new TextEncoder().encode(`my-diet-notebook:${cloudConfig.id}`),
-      iterations: 150000,
-      hash: "SHA-256",
-    },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
-}
-
-function base64FromBytes(bytes) {
-  return btoa(String.fromCharCode(...bytes));
-}
-
-function bytesFromBase64(text) {
-  return Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
 }
 
 function render() {
@@ -1098,7 +1078,7 @@ function saveCurrentExerciseAsWeekdayPreset() {
 
   exercisePresets[selectedDay] = preset;
   saveExercisePresets();
-  if (hasCloudConfig()) {
+  if (activeUser) {
     pushEntriesToCloud().catch((error) => {
       setSaveFeedback("exercise", "error", getCloudErrorMessage(error));
     });

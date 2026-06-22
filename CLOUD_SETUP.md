@@ -1,64 +1,41 @@
-# PCを開きっぱなしにしない同期
+# Supabaseで複数ユーザー対応を有効にする
 
-PCを閉じてもスマホとPCで同じデータを見るには、アプリ本体を公開ページに置き、記録データをSupabaseに保存します。
-記録データはアプリ側で暗号化してから保存します。
+このアプリはSupabase Authでユーザーを識別し、Row Level Security（RLS）で本人のデータだけを読み書きします。
 
-## 1. Supabaseで保存場所を作る
+## 1. テーブルとRLSを作成
 
-Supabaseで新しいプロジェクトを作り、SQL Editorで次を実行します。
+SupabaseのSQL Editorで `SUPABASE_SETUP.sql` を実行します。
 
-```sql
-create table public.diet_app_sync (
-  id text primary key,
-  encrypted_payload text not null,
-  updated_at timestamptz not null default now()
-);
+旧 `diet_app_sync` テーブルは新しいアプリから使われません。必要なデータを移行し終えるまでは削除せず、移行後に削除してください。
 
-alter table public.diet_app_sync enable row level security;
+## 2. メール認証を設定
 
-create policy "Anyone can read encrypted diet sync rows"
-on public.diet_app_sync
-for select
-to anon
-using (true);
+Supabase DashboardのAuthenticationでEmail認証を有効にします。
 
-create policy "Anyone can create encrypted diet sync rows"
-on public.diet_app_sync
-for insert
-to anon
-with check (true);
+- 本番運用では「Confirm email」を有効にする
+- URL ConfigurationのSite URLに公開先URLを設定する
+- Redirect URLsにも公開先URLを追加する
 
-create policy "Anyone can update encrypted diet sync rows"
-on public.diet_app_sync
-for update
-to anon
-using (true)
-with check (true);
+## 3. アプリへ接続情報を設定
+
+`config.js` にSupabaseのProject URLとPublishable keyを設定します。
+
+```js
+window.MY_DIET_CONFIG = {
+  supabaseUrl: "https://YOUR_PROJECT.supabase.co",
+  supabaseAnonKey: "sb_publishable_...",
+};
 ```
 
-Project SettingsのAPI画面から、次の2つを控えます。
+Publishable keyはブラウザで使う公開用キーです。`service_role`キーは絶対に設定しないでください。
 
-- Project URL
-- Publishable key
+## 4. 公開
 
-## 2. アプリをネット上に置く
-
-GitHub Pagesなどの静的サイト hosting に、このフォルダの次のファイルを置きます。
+次のファイルを同じ場所へ公開します。
 
 - `index.html`
 - `styles.css`
 - `app.js`
+- `config.js`
 
-`server.js` と `start-app.bat` は、家の中だけで使うローカル同期用なので、クラウド版には不要です。
-
-## 3. アプリで同期設定を入れる
-
-公開したアプリをPCとスマホで開き、クラウド同期欄に同じ内容を入れます。
-
-- Supabase URL: SupabaseのProject URL
-- Anon key: SupabaseのPublishable key。`sb_publishable_...` で始まるキー
-- 同期ID: 好きな名前。例 `my-diet-note`
-- 同期パスワード: 長めの自分だけの言葉
-
-同期パスワードを変えると、前のデータは読めません。
-スマホとPCでは必ず同じ同期IDと同期パスワードを使います。
+利用者はログイン画面から各自のメールアドレスで登録します。ログイン後のデータはユーザーID別に分離され、端末内キャッシュも別々に保存されます。

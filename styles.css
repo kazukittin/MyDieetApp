@@ -105,6 +105,96 @@ button {
   margin-left: 0;
 }
 
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(47, 133, 90, 0.22), transparent 34rem),
+    rgba(247, 244, 239, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.auth-screen[hidden] {
+  display: none;
+}
+
+.auth-card {
+  width: min(460px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 28px 80px rgba(20, 28, 38, 0.2);
+  padding: clamp(24px, 5vw, 38px);
+}
+
+.auth-card h1 {
+  margin: 4px 0 10px;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+}
+
+.auth-copy {
+  margin: 0 0 22px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.auth-form label span {
+  font-weight: 800;
+}
+
+.auth-form input {
+  width: 100%;
+}
+
+.auth-config-help {
+  margin-top: 18px;
+  border: 1px solid #e7c8bb;
+  border-radius: 8px;
+  background: var(--coral-soft);
+  padding: 14px;
+}
+
+.auth-config-help p {
+  margin: 6px 0 0;
+  color: #7a4438;
+  line-height: 1.6;
+}
+
+.account-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.account-panel > span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.account-panel > strong {
+  overflow-wrap: anywhere;
+  font-size: 1.08rem;
+}
+
+.danger-button {
+  color: #9b3d31;
+}
+
 .onboarding {
   position: fixed;
   inset: 0;
