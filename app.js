@@ -75,15 +75,6 @@ const supabaseClient = hasSupabaseConfig() && window.supabase
   : null;
 const foodHabitValues = ["water", "protein", "vegetables", "no_snack", "slow_eating"];
 const exerciseHabitValues = ["walk", "stretch", "strength"];
-const defaultExercisePresets = [
-  { day: "日", type: "full_body", minutes: 20, burnCalories: 90, intensity: "light", habits: ["stretch"], note: "回復日。全身を軽く動かして整える。" },
-  { day: "月", type: "walk", minutes: 30, burnCalories: 160, intensity: "normal", habits: ["walk"], note: "軽く歩いて週を始める。" },
-  { day: "火", type: "legs", minutes: 25, burnCalories: 180, intensity: "normal", habits: ["strength"], note: "脚の日。スクワットや下半身を中心に。" },
-  { day: "水", type: "back", minutes: 30, burnCalories: 190, intensity: "normal", habits: ["strength"], note: "背中の日。姿勢を意識して動く。" },
-  { day: "木", type: "abs", minutes: 20, burnCalories: 110, intensity: "light", habits: ["strength", "stretch"], note: "お腹の日。体幹を軽めに。" },
-  { day: "金", type: "chest", minutes: 30, burnCalories: 210, intensity: "hard", habits: ["strength"], note: "胸の日。週末前に少ししっかり動く。" },
-  { day: "土", type: "walk", minutes: 45, burnCalories: 260, intensity: "normal", habits: ["walk", "stretch"], note: "長めに歩く。終わったらストレッチ。" },
-];
 const defaultFoodPresets = [
   { meal: "breakfast", label: "朝の定番", calories: 420, habits: ["water", "protein"], note: "朝はたんぱく質を入れる。" },
   { meal: "lunch", label: "昼の定番", calories: 650, habits: ["protein", "vegetables"], note: "昼は主食と野菜を揃える。" },
@@ -637,7 +628,7 @@ function getDefaultExercisePresets() {
 function normalizeExercisePreset(preset) {
   return {
     id: typeof preset.id === "string" ? preset.id : createId(),
-    name: String(preset.name || getLegacyPresetName(preset)).trim().slice(0, 40),
+    name: normalizeExercisePresetName(preset),
     type: typeof preset.type === "string" ? preset.type : "",
     minutes: numberOrNull(preset.minutes) ?? 0,
     burnCalories: numberOrNull(preset.burnCalories) ?? 0,
@@ -647,9 +638,12 @@ function normalizeExercisePreset(preset) {
   };
 }
 
-function getLegacyPresetName(preset) {
-  if (!preset?.day) return "";
-  return `${preset.day}曜 ${getExerciseTypeLabel(preset.type)}`;
+function normalizeExercisePresetName(preset) {
+  const fallback = getExerciseTypeLabel(preset?.type);
+  const name = String(preset?.name || fallback || "運動プリセット")
+    .replace(/^[日月火水木金土](?:曜|曜日)\s*/u, "")
+    .trim();
+  return (name || fallback || "運動プリセット").slice(0, 40);
 }
 
 function createId() {
