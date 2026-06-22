@@ -876,7 +876,7 @@ function setupUnifiedScreen() {
     historyCarouselMount.append(slide);
   });
 
-  document.querySelector("#app-content").hidden = true;
+  document.querySelector("#app-content").remove();
   updateSummaryCarousel();
   updateHistoryCarousel();
   updateChartView();
