@@ -160,6 +160,22 @@ button {
   width: 100%;
 }
 
+.text-button {
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 750;
+  padding: 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.text-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .auth-config-help {
   margin-top: 18px;
   border: 1px solid #e7c8bb;

@@ -16,6 +16,7 @@ const authEmail = document.querySelector("#auth-email");
 const authPassword = document.querySelector("#auth-password");
 const authSubmit = document.querySelector("#auth-submit");
 const authModeToggle = document.querySelector("#auth-mode-toggle");
+const resendConfirmationButton = document.querySelector("#resend-confirmation");
 const authFeedback = document.querySelector("#auth-feedback");
 const authConfigHelp = document.querySelector("#auth-config-help");
 const accountEmail = document.querySelector("#account-email");
@@ -191,6 +192,33 @@ syncNowButton.addEventListener("click", (event) => {
 authModeToggle.addEventListener("click", () => {
   authMode = authMode === "login" ? "signup" : "login";
   updateAuthMode();
+});
+
+resendConfirmationButton.addEventListener("click", async () => {
+  if (!supabaseClient) return;
+  const email = authEmail.value.trim();
+  if (!email) {
+    setAuthFeedback("error", "確認メールを送るメールアドレスを入力してください。");
+    authEmail.focus();
+    return;
+  }
+
+  setAuthBusy(true);
+  setAuthFeedback("loading", "確認メールを再送しています...");
+  const { error } = await supabaseClient.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: getAuthRedirectUrl(),
+    },
+  });
+  setAuthBusy(false);
+
+  if (error) {
+    setAuthFeedback("error", getResendErrorMessage(error));
+    return;
+  }
+  setAuthFeedback("success", "確認メールを再送しました。迷惑メールフォルダも確認してください。");
 });
 
 authForm.addEventListener("submit", async (event) => {
@@ -663,6 +691,7 @@ function updateAuthMode() {
 function setAuthBusy(isBusy) {
   authSubmit.disabled = isBusy;
   authModeToggle.disabled = isBusy;
+  resendConfirmationButton.disabled = isBusy;
   authEmail.disabled = isBusy;
   authPassword.disabled = isBusy;
 }
@@ -679,6 +708,17 @@ function getAuthErrorMessage(error) {
   if (message.includes("already registered") || message.includes("already been registered")) return "このメールアドレスは登録済みです。";
   if (message.includes("password")) return "パスワードは8文字以上で設定してください。";
   return "認証に失敗しました。入力内容を確認してください。";
+}
+
+function getResendErrorMessage(error) {
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("rate limit") || message.includes("too many")) {
+    return "短時間に何度も送信されています。しばらく待ってから再送してください。";
+  }
+  if (message.includes("already confirmed")) {
+    return "このメールアドレスは確認済みです。通常のログインを試してください。";
+  }
+  return "確認メールを再送できませんでした。少し待ってから試してください。";
 }
 
 function setSyncState(status, message) {
