@@ -3,8 +3,12 @@ const recordDayBoundaryHour = 3;
 const today = getRecordDayDate(new Date());
 const isoToday = toIsoDate(today);
 
-const form = document.querySelector("#entry-form");
-const dateInput = document.querySelector("#entry-date");
+const weightForm = document.querySelector("#weight-form");
+const exerciseForm = document.querySelector("#exercise-form");
+const foodForm = document.querySelector("#food-form");
+const weightDateInput = document.querySelector("#weight-date");
+const exerciseDateInput = document.querySelector("#exercise-date");
+const foodDateInput = document.querySelector("#food-date");
 const clearTodayButton = document.querySelector("#clear-today");
 const exportButton = document.querySelector("#export-data");
 const syncStatus = document.querySelector("#sync-status");
@@ -16,11 +20,17 @@ const authEmail = document.querySelector("#auth-email");
 const authPassword = document.querySelector("#auth-password");
 const authSubmit = document.querySelector("#auth-submit");
 const authModeToggle = document.querySelector("#auth-mode-toggle");
+const forgotPasswordButton = document.querySelector("#forgot-password");
 const resendConfirmationButton = document.querySelector("#resend-confirmation");
 const authFeedback = document.querySelector("#auth-feedback");
 const authConfigHelp = document.querySelector("#auth-config-help");
 const accountEmail = document.querySelector("#account-email");
 const logoutButton = document.querySelector("#logout-button");
+const emailChangeForm = document.querySelector("#email-change-form");
+const newAccountEmail = document.querySelector("#new-account-email");
+const passwordChangeForm = document.querySelector("#password-change-form");
+const newAccountPassword = document.querySelector("#new-account-password");
+const deleteAccountButton = document.querySelector("#delete-account");
 const appShell = document.querySelector(".app-shell");
 const onboarding = document.querySelector("#onboarding");
 const onboardingForm = document.querySelector("#onboarding-form");
@@ -33,15 +43,25 @@ const saveExercisePresetButton = document.querySelector("#save-exercise-preset")
 const exercisePresetNameInput = document.querySelector("#exercise-preset-name");
 const exercisePresetList = document.querySelector("#exercise-preset-list");
 const foodPresetList = document.querySelector("#food-preset-list");
+const saveFoodPresetButton = document.querySelector("#save-food-preset");
+const foodPresetNameInput = document.querySelector("#food-preset-name");
 const pageButtons = document.querySelectorAll("[data-page-target]");
 const appPages = document.querySelectorAll(".app-page");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
 const weightModal = document.querySelector("#weight-modal");
 const openWeightModalButtons = document.querySelectorAll("[data-open-weight-modal]");
 const closeWeightModalButton = document.querySelector("#close-weight-modal");
+const undoToast = document.querySelector("#undo-toast");
+const undoMessage = document.querySelector("#undo-message");
+const undoDeleteButton = document.querySelector("#undo-delete");
 const profileStorageKey = "my-diet-notebook:profile:v2";
 const exercisePresetStorageKey = "my-diet-notebook:exercise-presets:v2";
-const cloudTable = "diet_user_data";
+const foodPresetStorageKey = "my-diet-notebook:food-presets:v1";
+const deletedEntriesStorageKey = "my-diet-notebook:deleted-entries:v1";
+const settingsUpdatedStorageKey = "my-diet-notebook:settings-updated:v1";
+const legacyCloudTable = "diet_user_data";
+const entriesCloudTable = "diet_entries";
+const settingsCloudTable = "diet_user_settings";
 const appConfig = window.MY_DIET_CONFIG || {};
 const supabaseClient = hasSupabaseConfig() && window.supabase
   ? window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey)
@@ -57,7 +77,7 @@ const defaultExercisePresets = [
   { day: "金", type: "chest", minutes: 30, burnCalories: 210, intensity: "hard", habits: ["strength"], note: "胸の日。週末前に少ししっかり動く。" },
   { day: "土", type: "walk", minutes: 45, burnCalories: 260, intensity: "normal", habits: ["walk", "stretch"], note: "長めに歩く。終わったらストレッチ。" },
 ];
-const foodPresets = [
+const defaultFoodPresets = [
   { meal: "breakfast", label: "朝の定番", calories: 420, habits: ["water", "protein"], note: "朝はたんぱく質を入れる。" },
   { meal: "lunch", label: "昼の定番", calories: 650, habits: ["protein", "vegetables"], note: "昼は主食と野菜を揃える。" },
   { meal: "dinner", label: "夜の定番", calories: 700, habits: ["vegetables", "slow_eating"], note: "夜はゆっくり食べて整える。" },
@@ -67,11 +87,20 @@ const foodPresets = [
 let activeUser = null;
 let authMode = "login";
 let entries = [];
+let deletedEntries = {};
 let profile = {};
 let exercisePresets = getDefaultExercisePresets();
+let foodPresets = getDefaultFoodPresets();
+let settingsUpdatedAt = new Date(0).toISOString();
 let comboChartRangeDays = 31;
+let lastDeletion = null;
+let undoTimer = null;
+const dirtyEntryDates = new Set();
+let settingsDirty = false;
 
-dateInput.value = isoToday;
+[weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
+  input.value = isoToday;
+});
 if (document.querySelector("#today-label")) {
   document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 }
@@ -85,89 +114,86 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden && activeUser) syncFromCloud();
 });
 
-form.addEventListener("submit", (event) => {
+weightForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const formData = new FormData(form);
+  const formData = new FormData(weightForm);
   const date = formData.get("date");
-  const scope = event.submitter?.dataset.saveScope || "all";
-  setSaveFeedback(scope, "saving", "保存しています...");
-  const previous = entries.find((item) => item.date === date);
-  const entry = {
-    date,
-    weight: previous?.weight ?? null,
-    weightMorning: previous?.weightMorning ?? null,
-    weightNight: previous?.weightNight ?? null,
-    sleep: previous?.sleep ?? null,
-    intakeCalories: previous?.intakeCalories ?? null,
-    mealCalories: previous?.mealCalories ?? {},
-    burnCalories: previous?.burnCalories ?? null,
-    exerciseMinutes: previous?.exerciseMinutes ?? null,
-    exerciseType: previous?.exerciseType ?? "",
-    exerciseIntensity: previous?.exerciseIntensity ?? "normal",
-    exerciseNote: previous?.exerciseNote ?? "",
-    meal: previous?.meal ?? 2,
-    meals: previous?.meals ?? [],
-    habits: previous?.habits ?? [],
-    mood: previous?.mood ?? "calm",
-    note: previous?.note ?? "",
-    updatedAt: new Date().toISOString(),
-  };
-
-  if (scope === "weight" || scope === "all") {
-    entry.weightMorning = numberOrNull(formData.get("weightMorning"));
-    entry.weightNight = numberOrNull(formData.get("weightNight"));
-    entry.weight = getPrimaryWeight(entry);
-    entry.sleep = numberOrNull(formData.get("sleep"));
-  }
-
-  if (scope === "food" || scope === "all") {
-    const selectedHabits = formData.getAll("habits");
-    const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
-    const selectedFood = selectedHabits.filter((habit) => foodHabitValues.includes(habit));
-    entry.mealCalories = getMealCaloriesFromForm(formData);
-    entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
-    entry.meals = formData.getAll("meals");
-    entry.meal = deriveMealScore(entry.meals, selectedFood);
-    entry.habits = [...new Set([...preservedExercise, ...selectedFood])];
-    entry.mood = formData.get("mood");
-    entry.note = String(formData.get("note") || "").trim();
-  }
-
-  if (scope === "exercise" || scope === "all") {
-    const selectedHabits = formData.getAll("habits");
-    const preservedFood = entry.habits.filter((habit) => foodHabitValues.includes(habit));
-    const selectedExercise = selectedHabits.filter((habit) => exerciseHabitValues.includes(habit));
-    entry.burnCalories = numberOrNull(formData.get("burnCalories"));
-    entry.exerciseMinutes = numberOrNull(formData.get("exerciseMinutes"));
-    entry.exerciseType = String(formData.get("exerciseType") || "");
-    entry.exerciseIntensity = String(formData.get("exerciseIntensity") || "normal");
-    entry.exerciseNote = String(formData.get("exerciseNote") || "").trim();
-    entry.habits = [...new Set([...preservedFood, ...selectedExercise])];
-  }
-
-  entries = entries.filter((item) => item.date !== date);
-  entries.push(entry);
-  entries.sort((a, b) => b.date.localeCompare(a.date));
+  setSaveFeedback("weight", "saving", "保存しています...");
+  const entry = getOrCreateEntry(date);
+  entry.weightMorning = numberOrNull(formData.get("weightMorning"));
+  entry.weightNight = numberOrNull(formData.get("weightNight"));
+  entry.weight = getPrimaryWeight(entry);
+  entry.sleep = numberOrNull(formData.get("sleep"));
+  commitEntry(entry);
   saveEntries();
   render();
-  setSaveFeedback(scope, "success", getSaveSuccessMessage(scope));
-  if (scope === "weight") {
-    window.setTimeout(closeWeightModal, 350);
-  }
+  setSaveFeedback("weight", "success", getSaveSuccessMessage("weight"));
+  window.setTimeout(closeWeightModal, 350);
 });
 
-dateInput.addEventListener("change", () => {
-  fillWeightFieldsForDate(dateInput.value);
+exerciseForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(exerciseForm);
+  const date = formData.get("date");
+  setSaveFeedback("exercise", "saving", "保存しています...");
+  const entry = getOrCreateEntry(date);
+  const selectedExercise = formData.getAll("habits").filter((habit) => exerciseHabitValues.includes(habit));
+  const preservedFood = entry.habits.filter((habit) => foodHabitValues.includes(habit));
+  entry.burnCalories = numberOrNull(formData.get("burnCalories"));
+  entry.exerciseMinutes = numberOrNull(formData.get("exerciseMinutes"));
+  entry.exerciseType = String(formData.get("exerciseType") || "");
+  entry.exerciseIntensity = String(formData.get("exerciseIntensity") || "normal");
+  entry.exerciseNote = String(formData.get("exerciseNote") || "").trim();
+  entry.habits = [...new Set([...preservedFood, ...selectedExercise])];
+  commitEntry(entry);
+  saveEntries();
+  render();
+  setSaveFeedback("exercise", "success", getSaveSuccessMessage("exercise"));
+});
+
+foodForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(foodForm);
+  const date = formData.get("date");
+  setSaveFeedback("food", "saving", "保存しています...");
+  const entry = getOrCreateEntry(date);
+  const selectedFood = formData.getAll("habits").filter((habit) => foodHabitValues.includes(habit));
+  const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
+  entry.mealCalories = getMealCaloriesFromForm(formData);
+  entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
+  entry.meals = formData.getAll("meals");
+  entry.meal = deriveMealScore(entry.meals, selectedFood);
+  entry.habits = [...new Set([...preservedExercise, ...selectedFood])];
+  entry.mood = formData.get("mood");
+  entry.note = String(formData.get("note") || "").trim();
+  commitEntry(entry);
+  saveEntries();
+  render();
+  setSaveFeedback("food", "success", getSaveSuccessMessage("food"));
+});
+
+weightDateInput.addEventListener("change", () => {
+  fillWeightFieldsForDate(weightDateInput.value);
+});
+exerciseDateInput.addEventListener("change", () => {
+  fillExerciseFormForDate(exerciseDateInput.value);
+});
+foodDateInput.addEventListener("change", () => {
+  fillFoodFormForDate(foodDateInput.value);
 });
 
 clearTodayButton.addEventListener("click", () => {
-  const date = dateInput.value || isoToday;
+  const date = isoToday;
+  if (!window.confirm("今日の体重・食事・運動記録をすべて削除しますか？")) return;
+  const previous = entries.find((entry) => entry.date === date);
+  if (previous) lastDeletion = { entry: structuredClone(previous), scope: "all" };
+  markEntryDeleted(date);
   entries = entries.filter((item) => item.date !== date);
   saveEntries();
-  form.reset();
-  dateInput.value = date;
+  fillAllFormsForDate(date);
   updateIntakeCaloriesTotal();
   render();
+  showUndoToast("今日の記録を削除しました。");
 });
 
 exportButton.addEventListener("click", () => {
@@ -184,6 +210,8 @@ exportButton.addEventListener("click", () => {
 syncNowButton.addEventListener("click", (event) => {
   event.preventDefault();
   if (!activeUser) {
+    dirtyEntryDates.clear();
+    settingsDirty = false;
     setCloudFeedback("error", "ログインしてください。");
     return;
   }
@@ -226,6 +254,24 @@ resendConfirmationButton.addEventListener("click", async () => {
   setAuthFeedback("success", "確認メールを再送しました。迷惑メールフォルダも確認してください。");
 });
 
+forgotPasswordButton.addEventListener("click", async () => {
+  if (!supabaseClient) return;
+  const email = authEmail.value.trim();
+  if (!email) {
+    setAuthFeedback("error", "登録したメールアドレスを入力してください。");
+    authEmail.focus();
+    return;
+  }
+  setAuthBusy(true);
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: getAuthRedirectUrl(),
+  });
+  setAuthBusy(false);
+  setAuthFeedback(error ? "error" : "success", error
+    ? "再設定メールを送れませんでした。少し待ってから試してください。"
+    : "パスワード再設定メールを送りました。");
+});
+
 authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!supabaseClient) {
@@ -264,6 +310,39 @@ logoutButton.addEventListener("click", async () => {
   await supabaseClient.auth.signOut();
 });
 
+emailChangeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const { error } = await supabaseClient.auth.updateUser({ email: newAccountEmail.value.trim() });
+  setCloudFeedback(error ? "error" : "success", error
+    ? "メールアドレスを変更できませんでした。"
+    : "確認メールを送りました。メール内のリンクを開くと変更されます。");
+  if (!error) emailChangeForm.reset();
+});
+
+passwordChangeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const { error } = await supabaseClient.auth.updateUser({ password: newAccountPassword.value });
+  setCloudFeedback(error ? "error" : "success", error
+    ? "パスワードを変更できませんでした。"
+    : "パスワードを変更しました。");
+  if (!error) passwordChangeForm.reset();
+});
+
+deleteAccountButton.addEventListener("click", async () => {
+  const confirmation = window.prompt("完全に削除するには「削除」と入力してください。");
+  if (confirmation !== "削除") return;
+  deleteAccountButton.disabled = true;
+  const { error } = await supabaseClient.rpc("delete_my_account");
+  deleteAccountButton.disabled = false;
+  if (error) {
+    setCloudFeedback("error", "アカウントを削除できませんでした。SQL設定を確認してください。");
+    return;
+  }
+  clearCurrentUserCache();
+  await supabaseClient.auth.signOut({ scope: "local" });
+  location.reload();
+});
+
 openWeightModalButtons.forEach((button) => {
   button.addEventListener("click", openWeightModal);
 });
@@ -271,6 +350,20 @@ closeWeightModalButton.addEventListener("click", closeWeightModal);
 weightModal.addEventListener("click", (event) => {
   if (event.target === weightModal) closeWeightModal();
 });
+
+document.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-edit-entry]");
+  if (editButton) {
+    editEntryScope(editButton.dataset.editEntry, editButton.dataset.entryDate);
+    return;
+  }
+  const deleteButton = event.target.closest("[data-delete-entry]");
+  if (deleteButton) {
+    deleteEntryScope(deleteButton.dataset.deleteEntry, deleteButton.dataset.entryDate);
+  }
+});
+
+undoDeleteButton.addEventListener("click", undoLastDeletion);
 
 openSettingsButton.addEventListener("click", openSettings);
 pageButtons.forEach((button) => {
@@ -285,6 +378,9 @@ rangeButtons.forEach((button) => {
 });
 if (saveExercisePresetButton) {
   saveExercisePresetButton.addEventListener("click", saveCurrentExerciseAsPreset);
+}
+if (saveFoodPresetButton) {
+  saveFoodPresetButton.addEventListener("click", saveCurrentFoodAsPreset);
 }
 document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
   input.addEventListener("input", updateIntakeCaloriesTotal);
@@ -320,8 +416,9 @@ onboardingForm.addEventListener("submit", (event) => {
   };
 
   saveProfileToDevice();
+  touchSettings();
   if (setupWeight !== null && !entries.some((entry) => entry.date === isoToday)) {
-    entries.push({
+    commitEntry({
       date: isoToday,
       weight: setupWeight,
       weightMorning: setupWeight,
@@ -341,13 +438,12 @@ onboardingForm.addEventListener("submit", (event) => {
       note: profile.note,
       updatedAt: new Date().toISOString(),
     });
-    entries.sort((a, b) => b.date.localeCompare(a.date));
     saveEntries();
   }
 
   onboarding.hidden = true;
   appShell.removeAttribute("inert");
-  fillFormForDate(isoToday);
+  fillAllFormsForDate(isoToday);
   render();
 });
 
@@ -366,6 +462,7 @@ profileForm.addEventListener("submit", (event) => {
     updatedAt: new Date().toISOString(),
   };
   saveProfileToDevice();
+  touchSettings();
   setProfileFeedback("success", "初期設定を保存しました。");
   render();
   if (activeUser) {
@@ -413,6 +510,69 @@ function loadExercisePresets() {
   }
 }
 
+function loadDeletedEntries() {
+  try {
+    const value = JSON.parse(localStorage.getItem(getUserStorageKey(deletedEntriesStorageKey))) || {};
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDeletedEntries() {
+  if (!activeUser) return;
+  localStorage.setItem(getUserStorageKey(deletedEntriesStorageKey), JSON.stringify(deletedEntries));
+}
+
+function markEntryDeleted(date) {
+  deletedEntries[date] = new Date().toISOString();
+  dirtyEntryDates.add(date);
+  saveDeletedEntries();
+}
+
+function loadSettingsUpdatedAt() {
+  return localStorage.getItem(getUserStorageKey(settingsUpdatedStorageKey)) || new Date(0).toISOString();
+}
+
+function touchSettings() {
+  settingsUpdatedAt = new Date().toISOString();
+  settingsDirty = true;
+  localStorage.setItem(getUserStorageKey(settingsUpdatedStorageKey), settingsUpdatedAt);
+}
+
+function getOrCreateEntry(date) {
+  const previous = entries.find((item) => item.date === date);
+  return {
+    date,
+    weight: previous?.weight ?? null,
+    weightMorning: previous?.weightMorning ?? null,
+    weightNight: previous?.weightNight ?? null,
+    sleep: previous?.sleep ?? null,
+    intakeCalories: previous?.intakeCalories ?? null,
+    mealCalories: previous?.mealCalories ?? {},
+    burnCalories: previous?.burnCalories ?? null,
+    exerciseMinutes: previous?.exerciseMinutes ?? null,
+    exerciseType: previous?.exerciseType ?? "",
+    exerciseIntensity: previous?.exerciseIntensity ?? "normal",
+    exerciseNote: previous?.exerciseNote ?? "",
+    meal: previous?.meal ?? 2,
+    meals: previous?.meals ?? [],
+    habits: previous?.habits ?? [],
+    mood: previous?.mood ?? "calm",
+    note: previous?.note ?? "",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function commitEntry(entry) {
+  delete deletedEntries[entry.date];
+  dirtyEntryDates.add(entry.date);
+  saveDeletedEntries();
+  entries = entries.filter((item) => item.date !== entry.date);
+  entries.push(entry);
+  entries.sort((a, b) => b.date.localeCompare(a.date));
+}
+
 function getDefaultExercisePresets() {
   return [];
 }
@@ -442,6 +602,43 @@ function createId() {
 function saveExercisePresets() {
   if (!activeUser) return;
   localStorage.setItem(getUserStorageKey(exercisePresetStorageKey), JSON.stringify(exercisePresets));
+}
+
+function getDefaultFoodPresets() {
+  return defaultFoodPresets.map((preset) => normalizeFoodPreset({
+    name: preset.label,
+    mealCalories: { [preset.meal]: preset.calories },
+    meals: [preset.meal],
+    habits: preset.habits,
+    mood: "calm",
+    note: preset.note,
+  }));
+}
+
+function loadFoodPresets() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(getUserStorageKey(foodPresetStorageKey)));
+    return Array.isArray(stored) ? stored.map(normalizeFoodPreset).filter((preset) => preset.name) : getDefaultFoodPresets();
+  } catch {
+    return getDefaultFoodPresets();
+  }
+}
+
+function normalizeFoodPreset(preset) {
+  return {
+    id: typeof preset.id === "string" ? preset.id : createId(),
+    name: String(preset.name || preset.label || "").trim().slice(0, 40),
+    mealCalories: preset.mealCalories && typeof preset.mealCalories === "object" ? preset.mealCalories : {},
+    meals: Array.isArray(preset.meals) ? preset.meals : (preset.meal ? [preset.meal] : []),
+    habits: Array.isArray(preset.habits) ? preset.habits.filter((habit) => foodHabitValues.includes(habit)) : [],
+    mood: typeof preset.mood === "string" ? preset.mood : "calm",
+    note: typeof preset.note === "string" ? preset.note : "",
+  };
+}
+
+function saveFoodPresets() {
+  if (!activeUser) return;
+  localStorage.setItem(getUserStorageKey(foodPresetStorageKey), JSON.stringify(foodPresets));
 }
 
 function saveProfileToDevice() {
@@ -527,8 +724,8 @@ function closeSettings() {
 }
 
 function openWeightModal() {
-  const selectedDate = dateInput.value || isoToday;
-  dateInput.value = selectedDate;
+  const selectedDate = weightDateInput.value || isoToday;
+  weightDateInput.value = selectedDate;
   fillWeightFieldsForDate(selectedDate);
   setSaveFeedback("weight", "", "朝か夜の体重を入力して保存できます。");
   weightModal.hidden = false;
@@ -539,6 +736,94 @@ function openWeightModal() {
 function closeWeightModal() {
   weightModal.hidden = true;
   document.body.classList.remove("modal-open");
+}
+
+function editEntryScope(scope, date) {
+  if (scope === "weight") {
+    weightDateInput.value = date;
+    fillWeightFieldsForDate(date);
+    openWeightModal();
+    return;
+  }
+  if (scope === "exercise") {
+    switchPage("exercise");
+    exerciseDateInput.value = date;
+    fillExerciseFormForDate(date);
+    exerciseForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  switchPage("food");
+  foodDateInput.value = date;
+  fillFoodFormForDate(date);
+  foodForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function deleteEntryScope(scope, date) {
+  const previous = entries.find((entry) => entry.date === date);
+  if (!previous) return;
+  const labels = { weight: "体重・睡眠", exercise: "運動", food: "食事" };
+  if (!window.confirm(`${formatDateLabel(date)}の${labels[scope]}記録を削除しますか？`)) return;
+
+  lastDeletion = { entry: structuredClone(previous), scope };
+  const entry = { ...previous, habits: [...(previous.habits || [])], updatedAt: new Date().toISOString() };
+  if (scope === "weight") {
+    entry.weight = null;
+    entry.weightMorning = null;
+    entry.weightNight = null;
+    entry.sleep = null;
+  } else if (scope === "exercise") {
+    entry.burnCalories = null;
+    entry.exerciseMinutes = null;
+    entry.exerciseType = "";
+    entry.exerciseIntensity = "normal";
+    entry.exerciseNote = "";
+    entry.habits = entry.habits.filter((habit) => !exerciseHabitValues.includes(habit));
+  } else {
+    entry.intakeCalories = null;
+    entry.mealCalories = {};
+    entry.meal = 2;
+    entry.meals = [];
+    entry.mood = "calm";
+    entry.note = "";
+    entry.habits = entry.habits.filter((habit) => !foodHabitValues.includes(habit));
+  }
+
+  if (isEntryEmpty(entry)) {
+    markEntryDeleted(date);
+    entries = entries.filter((item) => item.date !== date);
+  } else {
+    commitEntry(entry);
+  }
+  saveEntries();
+  fillAllFormsForDate(date);
+  render();
+  showUndoToast(`${labels[scope]}記録を削除しました。`);
+}
+
+function isEntryEmpty(entry) {
+  return !hasWeightEntry(entry) && !hasExerciseEntry(entry) && !hasFoodEntry(entry);
+}
+
+function showUndoToast(message) {
+  if (!lastDeletion) return;
+  window.clearTimeout(undoTimer);
+  undoMessage.textContent = message;
+  undoToast.hidden = false;
+  undoTimer = window.setTimeout(() => {
+    undoToast.hidden = true;
+    lastDeletion = null;
+  }, 8000);
+}
+
+function undoLastDeletion() {
+  if (!lastDeletion?.entry) return;
+  commitEntry({ ...lastDeletion.entry, updatedAt: new Date().toISOString() });
+  saveEntries();
+  fillAllFormsForDate(lastDeletion.entry.date);
+  render();
+  undoToast.hidden = true;
+  lastDeletion = null;
+  window.clearTimeout(undoTimer);
 }
 
 function fillWeightFieldsForDate(date) {
@@ -577,38 +862,67 @@ async function syncFromCloud() {
 
   try {
     setSyncState("同期中");
-    const { data: cloudEntry, error } = await supabaseClient
-      .from(cloudTable)
-      .select("payload,updated_at")
-      .eq("user_id", activeUser.id)
-      .maybeSingle();
-    if (error) throw error;
+    const [entryResult, settingsResult] = await Promise.all([
+      supabaseClient
+        .from(entriesCloudTable)
+        .select("entry_date,payload,updated_at,deleted_at")
+        .eq("user_id", activeUser.id),
+      supabaseClient
+        .from(settingsCloudTable)
+        .select("payload,updated_at")
+        .eq("user_id", activeUser.id)
+        .maybeSingle(),
+    ]);
+    if (entryResult.error) throw entryResult.error;
+    if (settingsResult.error) throw settingsResult.error;
 
-    if (!cloudEntry?.payload) {
-      await pushEntriesToCloud();
-      setSyncState("同期済み");
-      return;
+    let cloudRows = entryResult.data || [];
+    let cloudSettings = settingsResult.data;
+    if (!cloudRows.length && !cloudSettings) {
+      const legacyData = await fetchLegacyCloudData();
+      if (legacyData) {
+        const legacyEntries = Array.isArray(legacyData) ? legacyData : legacyData.entries;
+        entries = mergeEntries(entries, Array.isArray(legacyEntries) ? legacyEntries : []);
+        if (legacyData.profile) profile = legacyData.profile;
+        if (Array.isArray(legacyData.exercisePresets)) {
+          exercisePresets = legacyData.exercisePresets.map(normalizeExercisePreset).filter((preset) => preset.name);
+        }
+        if (Array.isArray(legacyData.foodPresets)) {
+          foodPresets = legacyData.foodPresets.map(normalizeFoodPreset).filter((preset) => preset.name);
+        }
+        settingsUpdatedAt = new Date().toISOString();
+      }
+      entries.forEach((entry) => dirtyEntryDates.add(entry.date));
+      Object.keys(deletedEntries).forEach((date) => dirtyEntryDates.add(date));
+      settingsDirty = true;
+    } else {
+      mergeCloudEntryRows(cloudRows);
+      if (cloudSettings?.payload && new Date(cloudSettings.updated_at) >= new Date(settingsUpdatedAt)) {
+        profile = cloudSettings.payload.profile || {};
+        exercisePresets = Array.isArray(cloudSettings.payload.exercisePresets)
+          ? cloudSettings.payload.exercisePresets.map(normalizeExercisePreset).filter((preset) => preset.name)
+          : [];
+        foodPresets = Array.isArray(cloudSettings.payload.foodPresets)
+          ? cloudSettings.payload.foodPresets.map(normalizeFoodPreset).filter((preset) => preset.name)
+          : getDefaultFoodPresets();
+        settingsUpdatedAt = cloudSettings.updated_at;
+      } else {
+        settingsDirty = true;
+      }
     }
 
-    const cloudData = cloudEntry.payload;
-    const cloudEntries = Array.isArray(cloudData) ? cloudData : cloudData.entries;
-    entries = mergeEntries(entries, Array.isArray(cloudEntries) ? cloudEntries : []);
-    if (cloudData.profile) {
-      profile = cloudData.profile;
-      saveProfileToDevice();
-    }
-    if (Array.isArray(cloudData.exercisePresets)) {
-      exercisePresets = cloudData.exercisePresets
-        .map(normalizeExercisePreset)
-        .filter((preset) => preset.name);
-      saveExercisePresets();
-    }
     purgeLegacySampleData();
     entries.sort((a, b) => b.date.localeCompare(a.date));
     localStorage.setItem(getUserStorageKey(storageKey), JSON.stringify(entries));
+    saveDeletedEntries();
+    saveProfileToDevice();
+    saveExercisePresets();
+    saveFoodPresets();
+    localStorage.setItem(getUserStorageKey(settingsUpdatedStorageKey), settingsUpdatedAt);
     await pushEntriesToCloud();
     setSyncState("同期済み");
     fillProfileForm();
+    fillAllFormsForDate(isoToday);
     showOnboardingIfNeeded();
     render();
   } catch (error) {
@@ -621,21 +935,98 @@ async function syncFromCloud() {
 
 async function pushEntriesToCloud() {
   if (!activeUser || !supabaseClient) return;
-  const { error } = await supabaseClient
-    .from(cloudTable)
-    .upsert({
+
+  const rows = Array.from(dirtyEntryDates).map((date) => {
+    const entry = entries.find((item) => item.date === date);
+    if (entry) {
+      return {
+        user_id: activeUser.id,
+        entry_date: date,
+        payload: entry,
+        updated_at: entry.updatedAt || new Date().toISOString(),
+        deleted_at: null,
+      };
+    }
+    const deletedAt = deletedEntries[date] || new Date().toISOString();
+    return {
       user_id: activeUser.id,
-      payload: { entries, profile, exercisePresets },
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
-  if (error) throw error;
+      entry_date: date,
+      payload: {},
+      updated_at: deletedAt,
+      deleted_at: deletedAt,
+    };
+  });
+
+  if (rows.length) {
+    const { error: entryError } = await supabaseClient
+      .from(entriesCloudTable)
+      .upsert(rows, { onConflict: "user_id,entry_date" });
+    if (entryError) throw entryError;
+    rows.forEach((row) => dirtyEntryDates.delete(row.entry_date));
+  }
+
+  if (settingsDirty) {
+    const { error: settingsError } = await supabaseClient
+      .from(settingsCloudTable)
+      .upsert({
+        user_id: activeUser.id,
+        payload: { profile, exercisePresets, foodPresets },
+        updated_at: settingsUpdatedAt,
+      }, { onConflict: "user_id" });
+    if (settingsError) throw settingsError;
+    settingsDirty = false;
+  }
   setSyncState("同期済み");
+}
+
+function mergeCloudEntryRows(rows) {
+  const localByDate = new Map(entries.map((entry) => [entry.date, entry]));
+  const cloudDates = new Set(rows.map((row) => row.entry_date));
+  rows.forEach((row) => {
+    const date = row.entry_date;
+    const localEntry = localByDate.get(date);
+    const localUpdatedAt = localEntry?.updatedAt || new Date(0).toISOString();
+    const localDeletedAt = deletedEntries[date] || new Date(0).toISOString();
+    const localLatest = new Date(localDeletedAt) > new Date(localUpdatedAt) ? localDeletedAt : localUpdatedAt;
+    const cloudLatest = row.deleted_at || row.updated_at || new Date(0).toISOString();
+    if (new Date(cloudLatest) < new Date(localLatest)) {
+      dirtyEntryDates.add(date);
+      return;
+    }
+
+    if (row.deleted_at) {
+      localByDate.delete(date);
+      deletedEntries[date] = row.deleted_at;
+      return;
+    }
+
+    const normalized = normalizeEntryWeights({ ...(row.payload || {}), date, updatedAt: row.updated_at });
+    localByDate.set(date, normalized);
+    delete deletedEntries[date];
+  });
+  localByDate.forEach((_entry, date) => {
+    if (!cloudDates.has(date)) dirtyEntryDates.add(date);
+  });
+  Object.keys(deletedEntries).forEach((date) => {
+    if (!cloudDates.has(date)) dirtyEntryDates.add(date);
+  });
+  entries = Array.from(localByDate.values());
+}
+
+async function fetchLegacyCloudData() {
+  const { data, error } = await supabaseClient
+    .from(legacyCloudTable)
+    .select("payload")
+    .eq("user_id", activeUser.id)
+    .maybeSingle();
+  if (error) return null;
+  return data?.payload || null;
 }
 
 function getCloudErrorMessage(error) {
   const message = String(error?.message || "");
   if (message.includes("does not exist") || message.includes("Could not find the table")) {
-    return "Supabaseのdiet_user_dataテーブルが見つかりません。";
+    return "Supabaseの同期テーブルが見つかりません。SUPABASE_SETUP.sqlを実行してください。";
   }
   if (message.includes("permission denied") || message.includes("row-level security")) {
     return "データベースのRLS設定を確認してください。";
@@ -670,8 +1061,15 @@ async function initializeAuth() {
 
   const { data } = await supabaseClient.auth.getSession();
   await applySession(data.session);
-  supabaseClient.auth.onAuthStateChange((_event, session) => {
-    window.setTimeout(() => applySession(session), 0);
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    window.setTimeout(async () => {
+      await applySession(session);
+      if (event === "PASSWORD_RECOVERY") {
+        openSettings();
+        newAccountPassword.focus();
+        setCloudFeedback("loading", "新しいパスワードを設定してください。");
+      }
+    }, 0);
   });
 }
 
@@ -682,8 +1080,11 @@ async function applySession(session) {
   activeUser = nextUser;
   if (!activeUser) {
     entries = [];
+    deletedEntries = {};
     profile = {};
     exercisePresets = getDefaultExercisePresets();
+    foodPresets = getDefaultFoodPresets();
+    settingsUpdatedAt = new Date(0).toISOString();
     authScreen.hidden = false;
     onboarding.hidden = true;
     settingsScreen.hidden = true;
@@ -697,13 +1098,19 @@ async function applySession(session) {
   authScreen.hidden = true;
   appShell.removeAttribute("inert");
   authPassword.value = "";
+  dirtyEntryDates.clear();
+  settingsDirty = false;
   importLegacyDeviceData();
   entries = loadEntries();
+  deletedEntries = loadDeletedEntries();
   profile = loadProfile();
   exercisePresets = loadExercisePresets();
+  foodPresets = loadFoodPresets();
+  settingsUpdatedAt = loadSettingsUpdatedAt();
   purgeLegacySampleData();
   accountEmail.textContent = activeUser.email || activeUser.id;
   fillProfileForm();
+  fillAllFormsForDate(isoToday);
   showOnboardingIfNeeded();
   render();
   await syncFromCloud();
@@ -725,6 +1132,18 @@ function importLegacyDeviceData() {
   });
 }
 
+function clearCurrentUserCache() {
+  if (!activeUser) return;
+  [
+    storageKey,
+    profileStorageKey,
+    exercisePresetStorageKey,
+    foodPresetStorageKey,
+    deletedEntriesStorageKey,
+    settingsUpdatedStorageKey,
+  ].forEach((key) => localStorage.removeItem(getUserStorageKey(key)));
+}
+
 function updateAuthMode() {
   const isSignup = authMode === "signup";
   authSubmit.textContent = isSignup ? "新規登録" : "ログイン";
@@ -738,6 +1157,7 @@ function updateAuthMode() {
 function setAuthBusy(isBusy) {
   authSubmit.disabled = isBusy;
   authModeToggle.disabled = isBusy;
+  forgotPasswordButton.disabled = isBusy;
   resendConfirmationButton.disabled = isBusy;
   authEmail.disabled = isBusy;
   authPassword.disabled = isBusy;
@@ -826,7 +1246,6 @@ function render() {
   renderFoodPage();
   renderWeightChart();
   renderHistory();
-  fillFormForDate(dateInput.value, false);
 }
 
 function renderSummary() {
@@ -842,7 +1261,7 @@ function renderSummary() {
 
   document.querySelector("#weight-trend").textContent = getWeightTrend(latestWithWeight, previousWithWeight);
 
-  const selected = entries.find((entry) => entry.date === dateInput.value);
+  const selected = entries.find((entry) => entry.date === isoToday);
   const weekEntries = getRecentEntries(7);
   const score = weekEntries.length ? Math.round(weekEntries.reduce((sum, entry) => sum + scoreEntry(entry), 0) / weekEntries.length) : null;
   document.querySelector("#weekly-score").textContent = score === null ? "--" : `${score}点`;
@@ -855,6 +1274,32 @@ function renderSummary() {
   document.querySelector("#habit-progress").style.width = `${habitRatio}%`;
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
   renderGoalSummary(latestWithWeight);
+  renderWeeklyReport(weekEntries);
+}
+
+function renderWeeklyReport(weekEntries) {
+  const streak = getStreak();
+  document.querySelector("#record-streak").textContent = `${streak}日連続`;
+  if (!weekEntries.length) {
+    document.querySelector("#weekly-report-text").textContent = "記録を続けると、今週の傾向が表示されます。";
+    return;
+  }
+  const weightEntries = weekEntries.filter(hasWeightEntry).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const weightChange = weightEntries.length >= 2
+    ? getPrimaryWeight(weightEntries.at(-1)) - getPrimaryWeight(weightEntries[0])
+    : null;
+  const exerciseMinutes = weekEntries.reduce((sum, entry) => sum + (numberOrNull(entry.exerciseMinutes) || 0), 0);
+  const calorieEntries = weekEntries.filter((entry) => numberOrNull(entry.intakeCalories) !== null);
+  const averageCalories = calorieEntries.length
+    ? Math.round(calorieEntries.reduce((sum, entry) => sum + entry.intakeCalories, 0) / calorieEntries.length)
+    : null;
+  const parts = [
+    `${weekEntries.length}日記録`,
+    weightChange === null ? null : `体重${weightChange >= 0 ? "+" : ""}${weightChange.toFixed(1)}kg`,
+    exerciseMinutes ? `運動${Math.round(exerciseMinutes)}分` : null,
+    averageCalories ? `平均${averageCalories}kcal` : null,
+  ].filter(Boolean);
+  document.querySelector("#weekly-report-text").textContent = parts.join("・");
 }
 
 function renderDailyStatus(entry) {
@@ -1067,6 +1512,10 @@ function renderHistory() {
           <div class="history-date">${formatDateLabel(entry.date)}</div>
           <div class="history-detail">${weight} / ${sleep} / ${calories} / ${meals} / ${habits}</div>
           <div class="score-pill">${scoreEntry(entry)}点</div>
+          <div class="history-actions">
+            <button type="button" data-edit-entry="weight" data-entry-date="${entry.date}">体重を編集</button>
+            <button type="button" data-delete-entry="weight" data-entry-date="${entry.date}">体重を削除</button>
+          </div>
         </article>
       `;
     })
@@ -1105,7 +1554,7 @@ function renderExercisePage() {
   const exerciseEntries = weekEntries.filter(hasExerciseEntry);
   const totalMinutes = exerciseEntries.reduce((sum, entry) => sum + (entry.exerciseMinutes || 0), 0);
   const totalBurn = exerciseEntries.reduce((sum, entry) => sum + (entry.burnCalories || 0), 0);
-  const todayEntry = entries.find((entry) => entry.date === dateInput.value);
+  const todayEntry = entries.find((entry) => entry.date === isoToday);
 
   renderExercisePresets();
   document.querySelector("#exercise-week-minutes").textContent = totalMinutes ? `${Math.round(totalMinutes)} 分` : "-- 分";
@@ -1157,6 +1606,7 @@ function renderExercisePresets() {
     button.addEventListener("click", () => {
       exercisePresets = exercisePresets.filter((item) => item.id !== button.dataset.deletePresetId);
       saveExercisePresets();
+      touchSettings();
       syncExercisePresets();
       renderExercisePresets();
       setSaveFeedback("exercise", "success", "プリセットを削除しました。");
@@ -1181,7 +1631,7 @@ function applyExercisePreset(preset) {
   const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${preset.intensity}"]`);
   if (intensityInput) intensityInput.checked = true;
   document.querySelector("#exercise-note").value = preset.note;
-  document.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
+  exerciseForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
     if (exerciseHabitValues.includes(checkbox.value)) checkbox.checked = preset.habits.includes(checkbox.value);
   });
 }
@@ -1201,7 +1651,7 @@ function saveCurrentExerciseAsPreset() {
     minutes: document.querySelector("#exercise-minutes")?.value || 0,
     burnCalories: document.querySelector("#burn-calories")?.value || 0,
     intensity: document.querySelector('input[name="exerciseIntensity"]:checked')?.value || "normal",
-    habits: Array.from(document.querySelectorAll('input[name="habits"]:checked'))
+    habits: Array.from(exerciseForm.querySelectorAll('input[name="habits"]:checked'))
       .map((checkbox) => checkbox.value)
       .filter((habit) => exerciseHabitValues.includes(habit)),
     note: document.querySelector("#exercise-note")?.value.trim() || "",
@@ -1209,6 +1659,7 @@ function saveCurrentExerciseAsPreset() {
 
   exercisePresets.push(preset);
   saveExercisePresets();
+  touchSettings();
   syncExercisePresets();
   exercisePresetNameInput.value = "";
   renderExercisePresets();
@@ -1247,6 +1698,10 @@ function renderExerciseHistory() {
           <span>${getExerciseTypeLabel(entry.exerciseType)} / ${getExerciseIntensityLabel(entry.exerciseIntensity)}</span>
         </div>
         <div>${getExerciseDetailLabel(entry)}</div>
+        <div class="history-actions">
+          <button type="button" data-edit-entry="exercise" data-entry-date="${entry.date}">編集</button>
+          <button type="button" data-delete-entry="exercise" data-entry-date="${entry.date}">削除</button>
+        </div>
       </article>
     `)
     .join("");
@@ -1296,7 +1751,7 @@ function getExerciseIntensityLabel(value) {
 }
 
 function renderFoodPage() {
-  const todayEntry = entries.find((entry) => entry.date === dateInput.value);
+  const todayEntry = entries.find((entry) => entry.date === isoToday);
   const weekEntries = getRecentEntries(7);
   const calorieEntries = weekEntries.filter((entry) => numberOrNull(entry.intakeCalories) !== null);
   const averageCalories = calorieEntries.length
@@ -1321,37 +1776,81 @@ function renderFoodPage() {
 
 function renderFoodPresets() {
   if (!foodPresetList) return;
+  if (!foodPresets.length) {
+    foodPresetList.innerHTML = '<p class="empty preset-empty">まだ食事プリセットがありません。</p>';
+    return;
+  }
   foodPresetList.innerHTML = foodPresets
     .map((preset) => `
-      <button class="preset-card" type="button" data-food-preset="${preset.meal}">
-        <span>${getMealName(preset.meal)}</span>
-        <strong>${preset.label}</strong>
-        <small>${preset.calories}kcal</small>
-      </button>
+      <article class="preset-card exercise-preset-card">
+        <button class="preset-apply-button" type="button" data-food-preset="${escapeHtml(preset.id)}">
+          <span>${escapeHtml(preset.name)}</span>
+          <strong>${getMealLogLabel(preset.meals)}</strong>
+          <small>${getMealCaloriesTotal(preset.mealCalories) ?? 0}kcal</small>
+        </button>
+        <button class="preset-delete-button" type="button" data-delete-food-preset="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を削除">削除</button>
+      </article>
     `)
     .join("");
 
   foodPresetList.querySelectorAll("[data-food-preset]").forEach((button) => {
     button.addEventListener("click", () => {
-      const preset = foodPresets.find((item) => item.meal === button.dataset.foodPreset);
+      const preset = foodPresets.find((item) => item.id === button.dataset.foodPreset);
       applyFoodPreset(preset);
-      setSaveFeedback("food", "success", `${preset.label}を入力しました。保存すると記録に残ります。`);
+      setSaveFeedback("food", "success", `${preset.name}を入力しました。保存すると記録に残ります。`);
+    });
+  });
+  foodPresetList.querySelectorAll("[data-delete-food-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      foodPresets = foodPresets.filter((item) => item.id !== button.dataset.deleteFoodPreset);
+      saveFoodPresets();
+      touchSettings();
+      syncExercisePresets();
+      renderFoodPresets();
     });
   });
 }
 
 function applyFoodPreset(preset) {
   if (!preset) return;
-  const input = document.querySelector(`#${preset.meal}-calories`);
-  if (input) input.value = preset.calories;
-  const mealCheckbox = document.querySelector(`input[name="meals"][value="${preset.meal}"]`);
-  if (mealCheckbox) mealCheckbox.checked = true;
-  document.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
-    if (foodHabitValues.includes(checkbox.value) && preset.habits.includes(checkbox.value)) checkbox.checked = true;
+  ["breakfast", "lunch", "dinner", "snack"].forEach((meal) => {
+    document.querySelector(`#${meal}-calories`).value = preset.mealCalories[meal] ?? "";
   });
-  const note = document.querySelector("#note");
-  if (note && preset.note && !note.value.trim()) note.value = preset.note;
+  foodForm.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
+    checkbox.checked = preset.meals.includes(checkbox.value);
+  });
+  foodForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
+    checkbox.checked = preset.habits.includes(checkbox.value);
+  });
+  document.querySelector("#mood").value = preset.mood;
+  document.querySelector("#note").value = preset.note;
   updateIntakeCaloriesTotal();
+}
+
+function saveCurrentFoodAsPreset() {
+  const name = foodPresetNameInput.value.trim();
+  if (!name) {
+    setSaveFeedback("food", "error", "プリセット名を入力してください。");
+    foodPresetNameInput.focus();
+    return;
+  }
+  const formData = new FormData(foodForm);
+  const preset = normalizeFoodPreset({
+    id: createId(),
+    name,
+    mealCalories: getMealCaloriesFromForm(formData),
+    meals: formData.getAll("meals"),
+    habits: formData.getAll("habits"),
+    mood: formData.get("mood"),
+    note: String(formData.get("note") || "").trim(),
+  });
+  foodPresets.push(preset);
+  saveFoodPresets();
+  touchSettings();
+  syncExercisePresets();
+  foodPresetNameInput.value = "";
+  renderFoodPresets();
+  setSaveFeedback("food", "success", `${preset.name}をプリセットに追加しました。`);
 }
 
 function updateIntakeCaloriesTotal() {
@@ -1378,6 +1877,10 @@ function renderFoodHistory() {
         </div>
         <div>${getMealLogLabel(entry.meals || [])} / ${getMealCaloriesLabel(entry)}</div>
         <div>${getFoodHabits(entry).map(getFoodHabitLabel).join("・") || "健康チェックなし"}</div>
+        <div class="history-actions">
+          <button type="button" data-edit-entry="food" data-entry-date="${entry.date}">編集</button>
+          <button type="button" data-delete-entry="food" data-entry-date="${entry.date}">削除</button>
+        </div>
       </article>
     `)
     .join("");
@@ -1509,6 +2012,8 @@ function renderWeightChart() {
   const weights = points
     .flatMap((point) => [getPrimaryWeight(point), numberOrNull(point.weightMorning), numberOrNull(point.weightNight)])
     .filter((weight) => weight !== null);
+  const goalWeight = numberOrNull(profile.goalWeight);
+  if (goalWeight !== null) weights.push(goalWeight);
   const min = Math.floor(Math.min(...weights) - 0.5);
   const max = Math.ceil(Math.max(...weights) + 0.5);
   const range = Math.max(1, max - min);
@@ -1535,9 +2040,14 @@ function renderWeightChart() {
   const morningDots = buildWeightDots(points, x, y, (point) => numberOrNull(point.weightMorning), "chart-morning-dot", "朝");
   const nightDots = buildWeightDots(points, x, y, (point) => numberOrNull(point.weightNight), "chart-night-dot", "夜");
   const fallbackDots = !morningPath && !nightPath ? buildWeightDots(points, x, y, getPrimaryWeight, "chart-dot", "体重") : "";
+  const goalLine = goalWeight === null ? "" : `
+    <line class="chart-goal-line" x1="${pad.left}" y1="${y(goalWeight)}" x2="${width - pad.right}" y2="${y(goalWeight)}"></line>
+    <text class="chart-goal-label" x="${width - pad.right}" y="${y(goalWeight) - 7}" text-anchor="end">目標 ${goalWeight.toFixed(1)}kg</text>
+  `;
 
   svg.insertAdjacentHTML("beforeend", `
     ${grid}
+    ${goalLine}
     <path class="chart-average" d="${averagePath}"></path>
     ${fallbackPath ? `<path class="chart-line" d="${fallbackPath}"></path>` : ""}
     ${morningPath ? `<path class="chart-morning-line" d="${morningPath}"></path>` : ""}
@@ -1577,35 +2087,48 @@ function averageWeight(items) {
   return items.reduce((sum, item) => sum + getPrimaryWeight(item), 0) / items.length;
 }
 
-function fillFormForDate(date, overwrite = true) {
-  const entry = entries.find((item) => item.date === date);
-  if (!entry || !overwrite) return;
+function fillAllFormsForDate(date) {
+  weightDateInput.value = date;
+  exerciseDateInput.value = date;
+  foodDateInput.value = date;
+  fillWeightFieldsForDate(date);
+  fillExerciseFormForDate(date);
+  fillFoodFormForDate(date);
+}
 
-  form.reset();
-  dateInput.value = date;
-  document.querySelector("#weight-morning").value = entry.weightMorning ?? (entry.weightNight === null || entry.weightNight === undefined ? entry.weight ?? "" : "");
-  document.querySelector("#weight-night").value = entry.weightNight ?? "";
-  document.querySelector("#sleep").value = entry.sleep ?? "";
-  const mealCalories = entry.mealCalories || {};
+function fillExerciseFormForDate(date) {
+  const entry = entries.find((item) => item.date === date);
+  exerciseForm.reset();
+  exerciseDateInput.value = date;
+  document.querySelector("#burn-calories").value = entry?.burnCalories ?? "";
+  document.querySelector("#exercise-minutes").value = entry?.exerciseMinutes ?? "";
+  setExerciseTypeValue(entry?.exerciseType ?? "");
+  const intensity = entry?.exerciseIntensity || "normal";
+  const intensityInput = exerciseForm.querySelector(`input[name="exerciseIntensity"][value="${intensity}"]`);
+  if (intensityInput) intensityInput.checked = true;
+  document.querySelector("#exercise-note").value = entry?.exerciseNote ?? "";
+  exerciseForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
+    checkbox.checked = (entry?.habits || []).includes(checkbox.value);
+  });
+}
+
+function fillFoodFormForDate(date) {
+  const entry = entries.find((item) => item.date === date);
+  foodForm.reset();
+  foodDateInput.value = date;
+  const mealCalories = entry?.mealCalories || {};
   document.querySelector("#breakfast-calories").value = mealCalories.breakfast ?? "";
   document.querySelector("#lunch-calories").value = mealCalories.lunch ?? "";
   document.querySelector("#dinner-calories").value = mealCalories.dinner ?? "";
   document.querySelector("#snack-calories").value = mealCalories.snack ?? "";
-  document.querySelector("#intake-calories").value = entry.intakeCalories ?? "";
-  document.querySelector("#burn-calories").value = entry.burnCalories ?? "";
-  document.querySelector("#exercise-minutes").value = entry.exerciseMinutes ?? "";
-  setExerciseTypeValue(entry.exerciseType ?? "");
-  const intensity = entry.exerciseIntensity || "normal";
-  const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${intensity}"]`);
-  if (intensityInput) intensityInput.checked = true;
-  document.querySelector("#exercise-note").value = entry.exerciseNote ?? "";
-  document.querySelector("#mood").value = entry.mood;
-  document.querySelector("#note").value = entry.note;
-  document.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
-    checkbox.checked = (entry.meals || []).includes(checkbox.value);
+  document.querySelector("#intake-calories").value = entry?.intakeCalories ?? "";
+  document.querySelector("#mood").value = entry?.mood || "calm";
+  document.querySelector("#note").value = entry?.note ?? "";
+  foodForm.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
+    checkbox.checked = (entry?.meals || []).includes(checkbox.value);
   });
-  document.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
-    checkbox.checked = entry.habits.includes(checkbox.value);
+  foodForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
+    checkbox.checked = (entry?.habits || []).includes(checkbox.value);
   });
 }
 

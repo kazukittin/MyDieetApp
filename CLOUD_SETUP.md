@@ -4,9 +4,9 @@
 
 ## 1. テーブルとRLSを作成
 
-SupabaseのSQL Editorで `SUPABASE_SETUP.sql` を実行します。
+SupabaseのSQL Editorで `SUPABASE_SETUP.sql` を実行します。以前の版を設定済みの場合も、同期方式とアカウント削除機能を追加するため、最新版をもう一度実行してください。
 
-旧 `diet_app_sync` テーブルは新しいアプリから使われません。必要なデータを移行し終えるまでは削除せず、移行後に削除してください。
+新しい同期では `diet_entries` と `diet_user_settings` を使います。旧 `diet_user_data` は初回同期時の移行元として読み取るため、全利用者の移行が終わるまでは残してください。
 
 ## 2. メール認証を設定
 

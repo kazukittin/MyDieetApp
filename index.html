@@ -24,6 +24,7 @@
           </label>
           <button id="auth-submit" class="primary-button" type="submit">ログイン</button>
           <button id="auth-mode-toggle" class="ghost-button" type="button">初めての方はこちら（新規登録）</button>
+          <button id="forgot-password" class="text-button" type="button">パスワードを忘れた方</button>
           <button id="resend-confirmation" class="text-button" type="button">確認メールを再送</button>
           <p id="auth-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
         </form>
@@ -132,10 +133,25 @@
             <div class="account-panel">
               <span>ログイン中</span>
               <strong id="account-email">--</strong>
+              <form id="email-change-form" class="compact-account-form">
+                <label>
+                  <span>新しいメールアドレス</span>
+                  <input id="new-account-email" type="email" required placeholder="new@example.com">
+                </label>
+                <button class="ghost-button" type="submit">メールアドレスを変更</button>
+              </form>
+              <form id="password-change-form" class="compact-account-form">
+                <label>
+                  <span>新しいパスワード</span>
+                  <input id="new-account-password" type="password" minlength="8" required placeholder="8文字以上">
+                </label>
+                <button class="ghost-button" type="submit">パスワードを変更</button>
+              </form>
               <div class="cloud-actions">
                 <button id="sync-now" class="ghost-button" type="button">今すぐ同期</button>
                 <button id="logout-button" class="ghost-button danger-button" type="button">ログアウト</button>
               </div>
+              <button id="delete-account" class="ghost-button danger-button" type="button">アカウントと全データを削除</button>
               <p id="cloud-feedback" class="cloud-feedback" role="status" aria-live="polite">ログイン中はスマホとPCで自動同期されます。</p>
             </div>
           </section>
@@ -154,7 +170,7 @@
         <button id="open-settings" class="tab-button" type="button">設定</button>
       </nav>
 
-      <form id="entry-form" autocomplete="off">
+      <div id="app-content">
         <section id="dashboard-page" class="app-page is-active" data-page="dashboard">
           <section class="page-section" aria-labelledby="dashboard-heading">
             <div class="section-heading">
@@ -255,6 +271,17 @@
                   <span id="food-status-pill" class="status-pill">食事 未入力</span>
                   <span id="exercise-status-pill" class="status-pill">運動 未入力</span>
                 </div>
+              </section>
+
+              <section class="panel weekly-report-panel">
+                <div class="panel-heading">
+                  <div>
+                    <p class="section-kicker">Weekly report</p>
+                    <h2>今週のまとめ</h2>
+                  </div>
+                  <strong id="record-streak">0日連続</strong>
+                </div>
+                <p id="weekly-report-text">記録を続けると、今週の傾向が表示されます。</p>
               </section>
             </aside>
           </div>
@@ -358,12 +385,16 @@
           </section>
 
           <section class="exercise-grid">
-            <section class="panel exercise-log-panel">
+            <form id="exercise-form" class="panel exercise-log-panel" autocomplete="off">
               <div class="preset-header">
                 <div>
                   <p class="section-kicker">Exercise presets</p>
                   <h2>運動プリセット</h2>
                 </div>
+                <label class="inline-date-field">
+                  <span>記録日</span>
+                  <input type="date" id="exercise-date" name="date" required>
+                </label>
               </div>
               <p class="preset-help">よく行う運動を登録し、カードを押して今日の運動へ入力できます。</p>
               <div id="exercise-preset-list" class="exercise-preset-list" aria-label="登録した運動プリセット"></div>
@@ -422,7 +453,7 @@
               </div>
               <button class="primary-button" type="submit" data-save-scope="exercise">運動を保存</button>
               <p id="exercise-save-feedback" class="save-feedback" role="status" aria-live="polite">今日できた運動を選んで保存できます。</p>
-            </section>
+            </form>
 
             <section class="panel exercise-history-panel">
               <div class="panel-heading">
@@ -469,12 +500,16 @@
           </section>
 
           <section class="food-grid">
-            <section class="panel entry-panel food-log-panel">
+            <form id="food-form" class="panel entry-panel food-log-panel" autocomplete="off">
               <div class="preset-header">
                 <div>
                   <p class="section-kicker">Meal presets</p>
                   <h2>食事プリセット</h2>
                 </div>
+                <label class="inline-date-field">
+                  <span>記録日</span>
+                  <input type="date" id="food-date" name="date" required>
+                </label>
               </div>
               <div id="food-preset-list" class="food-preset-list" aria-label="食事プリセット"></div>
 
@@ -538,9 +573,17 @@
                 <textarea id="note" name="note" rows="4" placeholder="食べたもの、体調、明日の自分に残したいこと"></textarea>
               </label>
 
+              <div class="preset-save-row">
+                <label>
+                  <span>プリセット名</span>
+                  <input id="food-preset-name" type="text" maxlength="40" placeholder="例: 平日の朝食">
+                </label>
+                <button id="save-food-preset" class="ghost-button" type="button">現在の内容をプリセットに追加</button>
+              </div>
+
               <button class="primary-button" type="submit" data-save-scope="food">食事を保存</button>
               <p id="food-save-feedback" class="save-feedback" role="status" aria-live="polite">食事や気分を記録して保存できます。</p>
-            </section>
+            </form>
 
             <section class="panel food-history-panel">
               <div class="panel-heading">
@@ -554,7 +597,7 @@
           </section>
         </section>
         <div id="weight-modal" class="record-modal" hidden>
-          <section class="record-modal-card" role="dialog" aria-modal="true" aria-labelledby="weight-modal-title">
+          <form id="weight-form" class="record-modal-card" role="dialog" aria-modal="true" aria-labelledby="weight-modal-title" autocomplete="off">
             <div class="settings-header">
               <div>
                 <p class="section-kicker">Weight log</p>
@@ -564,7 +607,7 @@
             </div>
             <label class="modal-date-field">
               <span>記録日</span>
-              <input type="date" id="entry-date" name="date" required>
+              <input type="date" id="weight-date" name="date" required>
             </label>
             <div class="field-row weight-log-grid">
               <label class="field-card">
@@ -582,10 +625,15 @@
             </div>
             <button class="primary-button" type="submit" data-save-scope="weight">体重を保存</button>
             <p id="weight-save-feedback" class="save-feedback" role="status" aria-live="polite">朝か夜の体重を入力して保存できます。</p>
-          </section>
+          </form>
         </div>
-      </form>
+      </div>
     </main>
+
+    <div id="undo-toast" class="undo-toast" hidden role="status" aria-live="polite">
+      <span id="undo-message">記録を削除しました。</span>
+      <button id="undo-delete" type="button">元に戻す</button>
+    </div>
 
     <script src="config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
