@@ -167,6 +167,8 @@
         <button class="tab-button" type="button" data-page-target="exercise">運動記録</button>
         <button class="tab-button" type="button" data-page-target="food">食事記録</button>
         <button class="tab-button weight-quick-button" type="button" data-open-weight-modal>＋ 体重を記録</button>
+        <button class="tab-button record-quick-button" type="button" data-open-exercise-modal>＋ 運動</button>
+        <button class="tab-button record-quick-button" type="button" data-open-food-modal>＋ 食事</button>
         <button id="open-settings" class="tab-button" type="button">設定</button>
       </nav>
 
@@ -359,7 +361,7 @@
               <p class="section-kicker">Exercise</p>
               <h2>運動記録画面</h2>
             </div>
-            <span>短い運動もちゃんと積み上げる</span>
+            <button class="primary-button section-record-button" type="button" data-open-exercise-modal>運動を記録</button>
           </div>
           <section class="exercise-summary-grid" aria-label="運動記録の概要">
             <article class="metric">
@@ -385,7 +387,7 @@
           </section>
 
           <section class="exercise-grid">
-            <form id="exercise-form" class="panel exercise-log-panel" autocomplete="off">
+            <form id="exercise-form" class="panel exercise-log-panel modal-entry-form" autocomplete="off" hidden>
               <div class="preset-header">
                 <div>
                   <p class="section-kicker">Exercise presets</p>
@@ -473,7 +475,7 @@
               <p class="section-kicker">Food</p>
               <h2>食事記録画面</h2>
             </div>
-            <span>カロリーより、整える行動から</span>
+            <button class="primary-button section-record-button" type="button" data-open-food-modal>食事を記録</button>
           </div>
 
           <section class="food-summary-grid" aria-label="食事記録の概要">
@@ -500,7 +502,7 @@
           </section>
 
           <section class="food-grid">
-            <form id="food-form" class="panel entry-panel food-log-panel" autocomplete="off">
+            <form id="food-form" class="panel entry-panel food-log-panel modal-entry-form" autocomplete="off" hidden>
               <div class="preset-header">
                 <div>
                   <p class="section-kicker">Meal presets</p>

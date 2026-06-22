@@ -51,6 +51,8 @@ const rangeButtons = document.querySelectorAll("[data-range-days]");
 const weightModal = document.querySelector("#weight-modal");
 const openWeightModalButtons = document.querySelectorAll("[data-open-weight-modal]");
 const closeWeightModalButton = document.querySelector("#close-weight-modal");
+const openExerciseModalButtons = document.querySelectorAll("[data-open-exercise-modal]");
+const openFoodModalButtons = document.querySelectorAll("[data-open-food-modal]");
 const undoToast = document.querySelector("#undo-toast");
 const undoMessage = document.querySelector("#undo-message");
 const undoDeleteButton = document.querySelector("#undo-delete");
@@ -101,6 +103,8 @@ let settingsDirty = false;
 [weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
   input.value = isoToday;
 });
+const exerciseModal = createEntryModal(exerciseForm, "exercise-modal", "運動記録を閉じる");
+const foodModal = createEntryModal(foodForm, "food-modal", "食事記録を閉じる");
 if (document.querySelector("#today-label")) {
   document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 }
@@ -149,6 +153,7 @@ exerciseForm.addEventListener("submit", (event) => {
   saveEntries();
   render();
   setSaveFeedback("exercise", "success", getSaveSuccessMessage("exercise"));
+  window.setTimeout(() => closeEntryModal(exerciseModal), 350);
 });
 
 foodForm.addEventListener("submit", (event) => {
@@ -170,6 +175,7 @@ foodForm.addEventListener("submit", (event) => {
   saveEntries();
   render();
   setSaveFeedback("food", "success", getSaveSuccessMessage("food"));
+  window.setTimeout(() => closeEntryModal(foodModal), 350);
 });
 
 weightDateInput.addEventListener("change", () => {
@@ -346,6 +352,12 @@ deleteAccountButton.addEventListener("click", async () => {
 openWeightModalButtons.forEach((button) => {
   button.addEventListener("click", openWeightModal);
 });
+openExerciseModalButtons.forEach((button) => {
+  button.addEventListener("click", () => openEntryModal(exerciseModal, "exercise"));
+});
+openFoodModalButtons.forEach((button) => {
+  button.addEventListener("click", () => openEntryModal(foodModal, "food"));
+});
 closeWeightModalButton.addEventListener("click", closeWeightModal);
 weightModal.addEventListener("click", (event) => {
   if (event.target === weightModal) closeWeightModal();
@@ -392,6 +404,14 @@ settingsScreen.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !weightModal.hidden) {
     closeWeightModal();
+    return;
+  }
+  if (event.key === "Escape" && !exerciseModal.hidden) {
+    closeEntryModal(exerciseModal);
+    return;
+  }
+  if (event.key === "Escape" && !foodModal.hidden) {
+    closeEntryModal(foodModal);
     return;
   }
   if (event.key === "Escape" && !settingsScreen.hidden) closeSettings();
@@ -735,7 +755,58 @@ function openWeightModal() {
 
 function closeWeightModal() {
   weightModal.hidden = true;
-  document.body.classList.remove("modal-open");
+  updateModalOpenState();
+}
+
+function createEntryModal(entryForm, id, closeLabel) {
+  const modal = document.createElement("div");
+  modal.id = id;
+  modal.className = "record-modal";
+  modal.hidden = true;
+  entryForm.before(modal);
+  modal.append(entryForm);
+  entryForm.hidden = false;
+  entryForm.classList.add("record-modal-card");
+  entryForm.setAttribute("role", "dialog");
+  entryForm.setAttribute("aria-modal", "true");
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "ghost-button modal-form-close";
+  closeButton.textContent = "閉じる";
+  closeButton.setAttribute("aria-label", closeLabel);
+  entryForm.prepend(closeButton);
+  closeButton.addEventListener("click", () => closeEntryModal(modal));
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeEntryModal(modal);
+  });
+  return modal;
+}
+
+function openEntryModal(modal, scope) {
+  if (scope === "exercise") {
+    const date = exerciseDateInput.value || isoToday;
+    exerciseDateInput.value = date;
+    fillExerciseFormForDate(date);
+  } else {
+    const date = foodDateInput.value || isoToday;
+    foodDateInput.value = date;
+    fillFoodFormForDate(date);
+  }
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  modal.querySelector(".modal-form-close")?.focus();
+}
+
+function closeEntryModal(modal) {
+  modal.hidden = true;
+  updateModalOpenState();
+}
+
+function updateModalOpenState() {
+  const hasOpenModal = [weightModal, exerciseModal, foodModal, settingsScreen]
+    .some((modal) => modal && !modal.hidden);
+  document.body.classList.toggle("modal-open", hasOpenModal);
 }
 
 function editEntryScope(scope, date) {
@@ -746,16 +817,14 @@ function editEntryScope(scope, date) {
     return;
   }
   if (scope === "exercise") {
-    switchPage("exercise");
     exerciseDateInput.value = date;
     fillExerciseFormForDate(date);
-    exerciseForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    openEntryModal(exerciseModal, "exercise");
     return;
   }
-  switchPage("food");
   foodDateInput.value = date;
   fillFoodFormForDate(date);
-  foodForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  openEntryModal(foodModal, "food");
 }
 
 function deleteEntryScope(scope, date) {
