@@ -192,6 +192,34 @@ button {
   justify-self: end;
 }
 
+.record-modal-nav {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  gap: 10px;
+  align-items: center;
+  margin: -4px 0 16px;
+}
+
+.record-modal-nav strong {
+  text-align: center;
+}
+
+.record-modal-nav button {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--green);
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.record-modal-nav button:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
 .modal-date-field {
   display: grid;
   gap: 7px;

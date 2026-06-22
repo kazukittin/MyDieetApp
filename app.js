@@ -108,6 +108,8 @@ let settingsDirty = false;
 });
 const exerciseModal = createEntryModal(exerciseForm, "exercise-modal", "運動記録を閉じる");
 const foodModal = createEntryModal(foodForm, "food-modal", "食事記録を閉じる");
+setupRecordModalNavigation(exerciseForm, "weight", "運動", "food");
+setupRecordModalNavigation(foodForm, "exercise", "食事", "weight");
 if (document.querySelector("#today-label")) {
   document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 }
@@ -379,6 +381,9 @@ recordMenuModal.querySelectorAll("[data-record-choice]").forEach((button) => {
       openEntryModal(foodModal, "food");
     }
   });
+});
+document.querySelectorAll("[data-record-navigate]").forEach((button) => {
+  button.addEventListener("click", () => switchRecordModal(button.dataset.recordNavigate));
 });
 closeWeightModalButton.addEventListener("click", closeWeightModal);
 weightModal.addEventListener("click", (event) => {
@@ -800,7 +805,7 @@ function createEntryModal(entryForm, id, closeLabel) {
   modal.id = id;
   modal.className = "record-modal";
   modal.hidden = true;
-  entryForm.before(modal);
+  document.body.append(modal);
   modal.append(entryForm);
   entryForm.hidden = false;
   entryForm.classList.add("record-modal-card");
@@ -818,6 +823,36 @@ function createEntryModal(entryForm, id, closeLabel) {
     if (event.target === modal) closeEntryModal(modal);
   });
   return modal;
+}
+
+function setupRecordModalNavigation(entryForm, previousScope, label, nextScope) {
+  const nav = document.createElement("div");
+  nav.className = "record-modal-nav";
+  nav.setAttribute("aria-label", "記録画面の切り替え");
+  nav.innerHTML = `
+    <button type="button" data-record-navigate="${previousScope}" aria-label="${getRecordScopeLabel(previousScope)}記録へ">←</button>
+    <strong>${label}</strong>
+    <button type="button" data-record-navigate="${nextScope}" aria-label="${getRecordScopeLabel(nextScope)}記録へ">→</button>
+  `;
+  const closeButton = entryForm.querySelector(".modal-form-close");
+  closeButton.after(nav);
+}
+
+function getRecordScopeLabel(scope) {
+  return { weight: "体重", exercise: "運動", food: "食事" }[scope] || "";
+}
+
+function switchRecordModal(scope) {
+  weightModal.hidden = true;
+  exerciseModal.hidden = true;
+  foodModal.hidden = true;
+  if (scope === "weight") {
+    openWeightModal();
+  } else if (scope === "exercise") {
+    openEntryModal(exerciseModal, "exercise");
+  } else {
+    openEntryModal(foodModal, "food");
+  }
 }
 
 function openEntryModal(modal, scope) {
