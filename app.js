@@ -24,7 +24,6 @@ const logoutButton = document.querySelector("#logout-button");
 const appShell = document.querySelector(".app-shell");
 const onboarding = document.querySelector("#onboarding");
 const onboardingForm = document.querySelector("#onboarding-form");
-const skipOnboardingButton = document.querySelector("#skip-onboarding");
 const settingsScreen = document.querySelector("#settings-screen");
 const openSettingsButton = document.querySelector("#open-settings");
 const closeSettingsButton = document.querySelector("#close-settings");
@@ -335,14 +334,8 @@ onboardingForm.addEventListener("submit", (event) => {
   }
 
   onboarding.hidden = true;
+  appShell.removeAttribute("inert");
   fillFormForDate(isoToday);
-  render();
-});
-
-skipOnboardingButton.addEventListener("click", () => {
-  profile = { skipped: true, updatedAt: new Date().toISOString() };
-  saveProfileToDevice();
-  onboarding.hidden = true;
   render();
 });
 
@@ -480,8 +473,18 @@ function hasWeightEntry(entry) {
 }
 
 function showOnboardingIfNeeded() {
-  if (!profile.startWeight && !profile.skipped && !entries.length) {
+  const isProfileComplete = (
+    numberOrNull(profile.startWeight) !== null
+    && numberOrNull(profile.goalWeight) !== null
+    && numberOrNull(profile.height) !== null
+    && Boolean(profile.pace)
+  );
+  if (!isProfileComplete) {
     onboarding.hidden = false;
+    appShell.setAttribute("inert", "");
+  } else {
+    onboarding.hidden = true;
+    appShell.removeAttribute("inert");
   }
 }
 
@@ -563,6 +566,7 @@ async function syncFromCloud() {
     await pushEntriesToCloud();
     setSyncState("同期済み");
     fillProfileForm();
+    showOnboardingIfNeeded();
     render();
   } catch (error) {
     const message = getCloudErrorMessage(error);
