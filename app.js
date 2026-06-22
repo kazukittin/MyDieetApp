@@ -53,6 +53,9 @@ const openWeightModalButtons = document.querySelectorAll("[data-open-weight-moda
 const closeWeightModalButton = document.querySelector("#close-weight-modal");
 const openExerciseModalButtons = document.querySelectorAll("[data-open-exercise-modal]");
 const openFoodModalButtons = document.querySelectorAll("[data-open-food-modal]");
+const openRecordMenuButtons = document.querySelectorAll("[data-open-record-menu]");
+const recordMenuModal = document.querySelector("#record-menu-modal");
+const closeRecordMenuButton = document.querySelector("#close-record-menu");
 const undoToast = document.querySelector("#undo-toast");
 const undoMessage = document.querySelector("#undo-message");
 const undoDeleteButton = document.querySelector("#undo-delete");
@@ -358,6 +361,25 @@ openExerciseModalButtons.forEach((button) => {
 openFoodModalButtons.forEach((button) => {
   button.addEventListener("click", () => openEntryModal(foodModal, "food"));
 });
+openRecordMenuButtons.forEach((button) => {
+  button.addEventListener("click", openRecordMenu);
+});
+closeRecordMenuButton.addEventListener("click", closeRecordMenu);
+recordMenuModal.addEventListener("click", (event) => {
+  if (event.target === recordMenuModal) closeRecordMenu();
+});
+recordMenuModal.querySelectorAll("[data-record-choice]").forEach((button) => {
+  button.addEventListener("click", () => {
+    closeRecordMenu();
+    if (button.dataset.recordChoice === "weight") {
+      openWeightModal();
+    } else if (button.dataset.recordChoice === "exercise") {
+      openEntryModal(exerciseModal, "exercise");
+    } else {
+      openEntryModal(foodModal, "food");
+    }
+  });
+});
 closeWeightModalButton.addEventListener("click", closeWeightModal);
 weightModal.addEventListener("click", (event) => {
   if (event.target === weightModal) closeWeightModal();
@@ -412,6 +434,10 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape" && !foodModal.hidden) {
     closeEntryModal(foodModal);
+    return;
+  }
+  if (event.key === "Escape" && !recordMenuModal.hidden) {
+    closeRecordMenu();
     return;
   }
   if (event.key === "Escape" && !settingsScreen.hidden) closeSettings();
@@ -758,6 +784,17 @@ function closeWeightModal() {
   updateModalOpenState();
 }
 
+function openRecordMenu() {
+  recordMenuModal.hidden = false;
+  document.body.classList.add("modal-open");
+  closeRecordMenuButton.focus();
+}
+
+function closeRecordMenu() {
+  recordMenuModal.hidden = true;
+  updateModalOpenState();
+}
+
 function createEntryModal(entryForm, id, closeLabel) {
   const modal = document.createElement("div");
   modal.id = id;
@@ -804,7 +841,7 @@ function closeEntryModal(modal) {
 }
 
 function updateModalOpenState() {
-  const hasOpenModal = [weightModal, exerciseModal, foodModal, settingsScreen]
+  const hasOpenModal = [recordMenuModal, weightModal, exerciseModal, foodModal, settingsScreen]
     .some((modal) => modal && !modal.hidden);
   document.body.classList.toggle("modal-open", hasOpenModal);
 }

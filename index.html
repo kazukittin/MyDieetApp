@@ -166,9 +166,7 @@
         <button class="tab-button" type="button" data-page-target="weight">体重推移</button>
         <button class="tab-button" type="button" data-page-target="exercise">運動記録</button>
         <button class="tab-button" type="button" data-page-target="food">食事記録</button>
-        <button class="tab-button weight-quick-button" type="button" data-open-weight-modal>＋ 体重を記録</button>
-        <button class="tab-button record-quick-button" type="button" data-open-exercise-modal>＋ 運動</button>
-        <button class="tab-button record-quick-button" type="button" data-open-food-modal>＋ 食事</button>
+        <button class="tab-button weight-quick-button" type="button" data-open-record-menu>＋ 記録する</button>
         <button id="open-settings" class="tab-button" type="button">設定</button>
       </nav>
 
@@ -295,7 +293,7 @@
               <p class="section-kicker">Weight</p>
               <h2>体重推移画面</h2>
             </div>
-            <span>日々の増減より流れを見る</span>
+            <button class="primary-button section-record-button" type="button" data-open-record-menu>記録する</button>
           </div>
 
           <section class="weight-summary-grid" aria-label="体重推移の概要">
@@ -361,7 +359,7 @@
               <p class="section-kicker">Exercise</p>
               <h2>運動記録画面</h2>
             </div>
-            <button class="primary-button section-record-button" type="button" data-open-exercise-modal>運動を記録</button>
+            <button class="primary-button section-record-button" type="button" data-open-record-menu>記録する</button>
           </div>
           <section class="exercise-summary-grid" aria-label="運動記録の概要">
             <article class="metric">
@@ -475,7 +473,7 @@
               <p class="section-kicker">Food</p>
               <h2>食事記録画面</h2>
             </div>
-            <button class="primary-button section-record-button" type="button" data-open-food-modal>食事を記録</button>
+            <button class="primary-button section-record-button" type="button" data-open-record-menu>記録する</button>
           </div>
 
           <section class="food-summary-grid" aria-label="食事記録の概要">
@@ -635,6 +633,32 @@
     <div id="undo-toast" class="undo-toast" hidden role="status" aria-live="polite">
       <span id="undo-message">記録を削除しました。</span>
       <button id="undo-delete" type="button">元に戻す</button>
+    </div>
+
+    <div id="record-menu-modal" class="record-modal" hidden>
+      <section class="record-menu-card" role="dialog" aria-modal="true" aria-labelledby="record-menu-title">
+        <div class="settings-header">
+          <div>
+            <p class="section-kicker">New record</p>
+            <h2 id="record-menu-title">何を記録しますか？</h2>
+          </div>
+          <button id="close-record-menu" class="ghost-button" type="button">閉じる</button>
+        </div>
+        <div class="record-choice-grid">
+          <button type="button" data-record-choice="weight">
+            <strong>体重</strong>
+            <span>朝・夜の体重と睡眠</span>
+          </button>
+          <button type="button" data-record-choice="exercise">
+            <strong>運動</strong>
+            <span>時間・消費・運動内容</span>
+          </button>
+          <button type="button" data-record-choice="food">
+            <strong>食事</strong>
+            <span>食事・カロリー・気分</span>
+          </button>
+        </div>
+      </section>
     </div>
 
     <script src="config.js"></script>

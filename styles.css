@@ -102,11 +102,6 @@ button {
   color: white;
 }
 
-.page-nav .record-quick-button {
-  background: var(--blue-soft);
-  color: var(--blue);
-}
-
 .section-record-button {
   width: auto;
   min-width: 140px;
@@ -144,6 +139,49 @@ button {
 
 .record-modal-card .primary-button {
   width: 100%;
+}
+
+.record-menu-card {
+  width: min(620px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 28px 80px rgba(20, 28, 38, 0.28);
+  padding: clamp(20px, 4vw, 30px);
+}
+
+.record-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.record-choice-grid button {
+  display: grid;
+  gap: 8px;
+  min-height: 132px;
+  align-content: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 18px;
+  text-align: left;
+}
+
+.record-choice-grid button:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.record-choice-grid strong {
+  font-size: 1.2rem;
+}
+
+.record-choice-grid span {
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .modal-entry-form {
@@ -1609,6 +1647,10 @@ legend {
 
   .inline-date-field {
     width: 100%;
+  }
+
+  .record-choice-grid {
+    grid-template-columns: 1fr;
   }
 
   .summary-grid {
