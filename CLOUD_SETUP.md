@@ -24,10 +24,22 @@ Supabase DashboardのAuthenticationでEmail認証を有効にします。
 window.MY_DIET_CONFIG = {
   supabaseUrl: "https://YOUR_PROJECT.supabase.co",
   supabaseAnonKey: "sb_publishable_...",
+  authRedirectUrl: "https://YOUR_PUBLIC_APP_URL/",
 };
 ```
 
 Publishable keyはブラウザで使う公開用キーです。`service_role`キーは絶対に設定しないでください。
+
+`authRedirectUrl`には、利用者が実際にアプリを開く公開URLを設定します。空欄の場合は、新規登録時にブラウザで開いていたURLを使用します。
+
+Supabase Dashboardの **Authentication → URL Configuration** でも次のように設定してください。
+
+- Site URL: `https://YOUR_PUBLIC_APP_URL/`
+- Redirect URLs: `https://YOUR_PUBLIC_APP_URL/`
+
+GitHub Pagesでサブディレクトリを使う場合は、リポジトリ名まで含む正確なURLを設定します。例: `https://username.github.io/MyDieetApp/`
+
+設定変更前に送信済みの確認メールには古いURLが残ります。古いリンクではなく、設定後に送った確認メールを使用してください。古いリンクをクリックした時点でメール確認だけ完了している場合もあるため、先に通常ログインを試しても構いません。
 
 ## 4. 公開
 

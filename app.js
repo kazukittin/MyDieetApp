@@ -206,7 +206,13 @@ authForm.addEventListener("submit", async (event) => {
   setAuthFeedback("loading", authMode === "signup" ? "アカウントを作成しています..." : "ログインしています...");
 
   const result = authMode === "signup"
-    ? await supabaseClient.auth.signUp({ email, password })
+    ? await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(),
+      },
+    })
     : await supabaseClient.auth.signInWithPassword({ email, password });
 
   setAuthBusy(false);
@@ -568,6 +574,12 @@ function hasSupabaseConfig() {
     && appConfig.supabaseAnonKey
     && !String(appConfig.supabaseUrl).includes("YOUR_"),
   );
+}
+
+function getAuthRedirectUrl() {
+  const configuredUrl = String(appConfig.authRedirectUrl || "").trim();
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+  return `${location.origin}${location.pathname}`;
 }
 
 async function initializeAuth() {
