@@ -202,6 +202,39 @@ button {
   overflow-wrap: anywhere;
 }
 
+#food-form {
+  overflow-x: hidden;
+}
+
+#food-form .food-preset-list,
+#food-form .meal-calorie-grid,
+#food-form .preset-save-row,
+#food-form .checks {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#food-form .preset-card,
+#food-form .preset-apply-button,
+#food-form .field-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#food-form .preset-apply-button strong,
+#food-form .preset-apply-button small,
+#food-form .preset-apply-button span,
+#food-form .checks span {
+  overflow-wrap: anywhere;
+}
+
+#food-form input,
+#food-form select,
+#food-form textarea {
+  width: 100%;
+  min-width: 0;
+}
+
 .record-modal-card .primary-button {
   width: 100%;
 }
@@ -1936,7 +1969,9 @@ legend {
   }
 
   #exercise-form .preset-edit-actions,
-  #exercise-form .preset-edit-actions button {
+  #exercise-form .preset-edit-actions button,
+  #food-form .preset-edit-actions,
+  #food-form .preset-edit-actions button {
     width: 100%;
   }
 
@@ -1946,6 +1981,11 @@ legend {
   }
 
   .meal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #food-form .food-preset-list,
+  #food-form .meal-calorie-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2044,6 +2084,11 @@ legend {
   }
 
   .food-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #food-form .food-preset-list,
+  #food-form .meal-calorie-grid {
     grid-template-columns: 1fr;
   }
 
