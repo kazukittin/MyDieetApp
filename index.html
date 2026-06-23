@@ -87,10 +87,19 @@
           <button id="close-settings" class="ghost-button" type="button">閉じる</button>
         </div>
 
+        <div class="settings-tabs" role="tablist" aria-label="設定カテゴリー">
+          <button class="is-active" type="button" role="tab" data-settings-tab="profile">プロフィール</button>
+          <button type="button" role="tab" data-settings-tab="account">アカウント</button>
+        </div>
+
         <div class="settings-grid">
-          <section class="settings-section">
-            <h3>初期設定</h3>
-            <p>目標体重やペースをあとから調整できます。</p>
+          <section class="settings-section is-active" data-settings-panel="profile">
+            <div class="settings-section-heading">
+              <div>
+                <h3>プロフィール</h3>
+                <p>体重目標とペースを調整します。</p>
+              </div>
+            </div>
             <form id="profile-form" class="settings-form" autocomplete="off">
               <div class="field-row">
                 <label class="field-card">
@@ -120,37 +129,56 @@
                 <span>意識したいこと</span>
                 <textarea id="profile-note" name="profileNote" rows="3" placeholder="例: 夜更かしを減らす、昼に歩く、間食を整える"></textarea>
               </label>
-              <button class="primary-button" type="submit">初期設定を保存</button>
-              <p id="profile-feedback" class="cloud-feedback" role="status" aria-live="polite">保存すると目標カードに反映されます。</p>
+              <button class="primary-button" type="submit">変更を保存</button>
+              <p id="profile-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
             </form>
           </section>
 
-          <section class="settings-section">
-            <h3>アカウント</h3>
-            <p>ログイン中の本人だけが、この記録を閲覧・更新できます。</p>
-            <div class="account-panel">
-              <span>ログイン中</span>
-              <strong id="account-email">--</strong>
-              <form id="email-change-form" class="compact-account-form">
-                <label>
-                  <span>新しいメールアドレス</span>
-                  <input id="new-account-email" type="email" required placeholder="new@example.com">
-                </label>
-                <button class="ghost-button" type="submit">メールアドレスを変更</button>
-              </form>
-              <form id="password-change-form" class="compact-account-form">
-                <label>
-                  <span>新しいパスワード</span>
-                  <input id="new-account-password" type="password" minlength="8" required placeholder="8文字以上">
-                </label>
-                <button class="ghost-button" type="submit">パスワードを変更</button>
-              </form>
-              <div class="cloud-actions">
-                <button id="sync-now" class="ghost-button" type="button">今すぐ同期</button>
-                <button id="logout-button" class="ghost-button danger-button" type="button">ログアウト</button>
+          <section class="settings-section" data-settings-panel="account" hidden>
+            <div class="settings-section-heading">
+              <div>
+                <h3>アカウント</h3>
+                <p>ログインとセキュリティを管理します。</p>
               </div>
-              <button id="delete-account" class="ghost-button danger-button" type="button">アカウントと全データを削除</button>
-              <p id="cloud-feedback" class="cloud-feedback" role="status" aria-live="polite">ログイン中はスマホとPCで自動同期されます。</p>
+              <span class="sync-state-pill">自動同期</span>
+            </div>
+            <div class="account-panel">
+              <span>メールアドレス</span>
+              <strong id="account-email">--</strong>
+
+              <details class="account-disclosure">
+                <summary>メールアドレスを変更</summary>
+                <form id="email-change-form" class="compact-account-form">
+                  <label>
+                    <span>新しいメールアドレス</span>
+                    <input id="new-account-email" type="email" required placeholder="new@example.com">
+                  </label>
+                  <button class="ghost-button" type="submit">確認メールを送る</button>
+                </form>
+              </details>
+
+              <details class="account-disclosure">
+                <summary>パスワードを変更</summary>
+                <form id="password-change-form" class="compact-account-form">
+                  <label>
+                    <span>新しいパスワード</span>
+                    <input id="new-account-password" type="password" minlength="8" required placeholder="8文字以上">
+                  </label>
+                  <button class="ghost-button" type="submit">パスワードを更新</button>
+                </form>
+              </details>
+
+              <div class="account-secondary-actions">
+                <button id="sync-now" class="text-button" type="button">今すぐ同期</button>
+                <button id="logout-button" class="ghost-button" type="button">ログアウト</button>
+              </div>
+
+              <details class="account-disclosure danger-disclosure">
+                <summary>危険な操作</summary>
+                <p>アカウントとすべての記録を完全に削除します。この操作は元に戻せません。</p>
+                <button id="delete-account" class="ghost-button danger-button" type="button">アカウントと全データを削除</button>
+              </details>
+              <p id="cloud-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
             </div>
           </section>
 

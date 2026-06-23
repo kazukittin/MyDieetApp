@@ -37,6 +37,8 @@ const onboardingForm = document.querySelector("#onboarding-form");
 const settingsScreen = document.querySelector("#settings-screen");
 const openSettingsButton = document.querySelector("#open-settings");
 const closeSettingsButton = document.querySelector("#close-settings");
+const settingsTabButtons = document.querySelectorAll("[data-settings-tab]");
+const settingsPanels = document.querySelectorAll("[data-settings-panel]");
 const profileForm = document.querySelector("#profile-form");
 const profileFeedback = document.querySelector("#profile-feedback");
 const saveExercisePresetButton = document.querySelector("#save-exercise-preset");
@@ -459,6 +461,9 @@ document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
   input.addEventListener("input", updateIntakeCaloriesTotal);
 });
 closeSettingsButton.addEventListener("click", closeSettings);
+settingsTabButtons.forEach((button) => {
+  button.addEventListener("click", () => switchSettingsTab(button.dataset.settingsTab));
+});
 settingsScreen.addEventListener("click", (event) => {
   if (event.target === settingsScreen) closeSettings();
 });
@@ -804,11 +809,25 @@ function fillProfileForm() {
 function openSettings() {
   fillProfileForm();
   accountEmail.textContent = activeUser?.email || "--";
+  switchSettingsTab("profile");
   settingsScreen.hidden = false;
 }
 
 function closeSettings() {
   settingsScreen.hidden = true;
+}
+
+function switchSettingsTab(tabName) {
+  settingsTabButtons.forEach((button) => {
+    const isActive = button.dataset.settingsTab === tabName;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  settingsPanels.forEach((panel) => {
+    const isActive = panel.dataset.settingsPanel === tabName;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
 }
 
 function setupUnifiedScreen() {
