@@ -1642,6 +1642,10 @@ legend {
   line-height: 1.5;
 }
 
+.cloud-feedback:empty {
+  display: none;
+}
+
 .save-feedback {
   margin: 0;
   border-radius: 8px;
