@@ -1025,15 +1025,6 @@ function switchRecordModal(scope) {
 }
 
 function openEntryModal(modal, scope) {
-  if (scope === "exercise") {
-    const date = exerciseDateInput.value || isoToday;
-    exerciseDateInput.value = date;
-    fillExerciseFormForDate(date);
-  } else {
-    const date = foodDateInput.value || isoToday;
-    foodDateInput.value = date;
-    fillFoodFormForDate(date);
-  }
   modal.hidden = false;
   document.body.classList.add("modal-open");
   modal.querySelector(".modal-form-close")?.focus();
