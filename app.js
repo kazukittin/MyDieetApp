@@ -179,7 +179,7 @@ foodForm.addEventListener("submit", (event) => {
   const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
   entry.mealCalories = getMealCaloriesFromForm(formData);
   entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
-  entry.meals = formData.getAll("meals");
+  entry.meals = getMealsFromCalories(entry.mealCalories);
   entry.meal = deriveMealScore(entry.meals, selectedFood);
   entry.habits = [...new Set([...preservedExercise, ...selectedFood])];
   entry.mood = formData.get("mood");
@@ -2174,7 +2174,7 @@ function saveCurrentFoodAsPreset() {
     id: editingFoodPresetId || createId(),
     name,
     mealCalories: getMealCaloriesFromForm(formData),
-    meals: formData.getAll("meals"),
+    meals: getMealsFromCalories(getMealCaloriesFromForm(formData)),
     habits: formData.getAll("habits"),
     mood: formData.get("mood"),
     note: String(formData.get("note") || "").trim(),
@@ -2459,6 +2459,11 @@ function fillAllFormsForDate(date) {
   fillWeightFieldsForDate(date);
   fillExerciseFormForDate(date);
   fillFoodFormForDate(date);
+}
+
+function getMealsFromCalories(mealCalories = {}) {
+  return ["breakfast", "lunch", "dinner", "snack"]
+    .filter((meal) => numberOrNull(mealCalories[meal]) !== null);
 }
 
 function fillExerciseFormForDate(date) {
