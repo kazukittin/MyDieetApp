@@ -82,7 +82,6 @@ const appConfig = window.MY_DIET_CONFIG || {};
 const supabaseClient = hasSupabaseConfig() && window.supabase
   ? window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey)
   : null;
-const foodHabitValues = ["water", "protein", "vegetables", "no_snack", "slow_eating"];
 const exerciseHabitValues = ["walk", "stretch", "strength"];
 const defaultFoodPresets = [
   { meal: "breakfast", label: "朝の定番", calories: 420, habits: ["water", "protein"], note: "朝はたんぱく質を入れる。" },
@@ -156,13 +155,12 @@ exerciseForm.addEventListener("submit", (event) => {
   setSaveFeedback("exercise", "saving", "保存しています...");
   const entry = getOrCreateEntry(date);
   const selectedExercise = formData.getAll("habits").filter((habit) => exerciseHabitValues.includes(habit));
-  const preservedFood = entry.habits.filter((habit) => foodHabitValues.includes(habit));
   entry.burnCalories = numberOrNull(formData.get("burnCalories"));
   entry.exerciseMinutes = numberOrNull(formData.get("exerciseMinutes"));
   entry.exerciseType = String(formData.get("exerciseType") || "");
   entry.exerciseIntensity = String(formData.get("exerciseIntensity") || "normal");
   entry.exerciseNote = String(formData.get("exerciseNote") || "").trim();
-  entry.habits = [...new Set([...preservedFood, ...selectedExercise])];
+  entry.habits = selectedExercise;
   commitEntry(entry);
   saveEntries();
   render();
@@ -181,7 +179,6 @@ foodForm.addEventListener("submit", (event) => {
   entry.meals = getMealsFromCalories(entry.mealCalories);
   entry.meal = deriveMealScore(entry.meals, []);
   entry.habits = preservedExercise;
-  entry.mood = "calm";
   entry.note = String(formData.get("note") || "").trim();
   commitEntry(entry);
   saveEntries();
@@ -527,7 +524,6 @@ onboardingForm.addEventListener("submit", (event) => {
       meal: 3,
       meals: [],
       habits: ["water"],
-      mood: "calm",
       note: profile.note,
       updatedAt: new Date().toISOString(),
     });
@@ -651,7 +647,6 @@ function getOrCreateEntry(date) {
     meal: previous?.meal ?? 2,
     meals: previous?.meals ?? [],
     habits: previous?.habits ?? [],
-    mood: previous?.mood ?? "calm",
     note: previous?.note ?? "",
     updatedAt: new Date().toISOString(),
   };
@@ -705,8 +700,6 @@ function getDefaultFoodPresets() {
     name: preset.label,
     mealCalories: { [preset.meal]: preset.calories },
     meals: [preset.meal],
-    habits: preset.habits,
-    mood: "calm",
     note: preset.note,
   }));
 }
@@ -726,8 +719,6 @@ function normalizeFoodPreset(preset) {
     name: String(preset.name || preset.label || "").trim().slice(0, 40),
     mealCalories: preset.mealCalories && typeof preset.mealCalories === "object" ? preset.mealCalories : {},
     meals: Array.isArray(preset.meals) ? preset.meals : (preset.meal ? [preset.meal] : []),
-    habits: Array.isArray(preset.habits) ? preset.habits.filter((habit) => foodHabitValues.includes(habit)) : [],
-    mood: typeof preset.mood === "string" ? preset.mood : "calm",
     note: typeof preset.note === "string" ? preset.note : "",
   };
 }
@@ -1094,9 +1085,7 @@ function deleteEntryScope(scope, date) {
     entry.mealCalories = {};
     entry.meal = 2;
     entry.meals = [];
-    entry.mood = "calm";
     entry.note = "";
-    entry.habits = entry.habits.filter((habit) => !foodHabitValues.includes(habit));
   }
 
   if (isEntryEmpty(entry)) {
@@ -1795,12 +1784,11 @@ function renderHistory() {
       const weight = getWeightHistoryLabel(entry);
       const sleep = entry.sleep === null ? "睡眠未入力" : `${entry.sleep}時間睡眠`;
       const calories = getCalorieLabel(entry);
-      const habits = entry.habits.length ? `${entry.habits.length}個の行動` : "行動チェックなし";
       const meals = getMealLogLabel(entry.meals || []);
       return `
         <article class="history-item">
           <div class="history-date">${formatDateLabel(entry.date)}</div>
-          <div class="history-detail">${weight} / ${sleep} / ${calories} / ${meals} / ${habits}</div>
+          <div class="history-detail">${weight} / ${sleep} / ${calories} / ${meals}</div>
           <div class="score-pill">${scoreEntry(entry)}点</div>
           <div class="history-actions">
             <button type="button" data-edit-entry="weight" data-entry-date="${entry.date}">体重を編集</button>
@@ -2102,7 +2090,7 @@ function renderFoodPage() {
     ? calorieEntries.reduce((sum, entry) => sum + numberOrNull(entry.intakeCalories), 0) / calorieEntries.length
     : null;
   const mealCount = (todayEntry?.meals || []).length;
-  const habitCount = getFoodHabits(todayEntry).length;
+  const recordedFoodDays = calorieEntries.length;
 
   renderFoodPresets();
   document.querySelector("#food-today-calories").textContent = todayEntry?.intakeCalories === null || todayEntry?.intakeCalories === undefined
@@ -2111,7 +2099,7 @@ function renderFoodPage() {
   document.querySelector("#food-today-calories-detail").textContent = todayEntry ? "朝・昼・夜・間食の合計" : "入力すると表示";
   document.querySelector("#food-meal-count").textContent = `${mealCount || "--"} / 4`;
   document.querySelector("#food-meal-count-detail").textContent = mealCount ? getMealLogLabel(todayEntry.meals || []) : "朝・昼・夜・間食";
-  document.querySelector("#food-habit-count").textContent = `${habitCount || "--"} / ${foodHabitValues.length}`;
+  document.querySelector("#food-habit-count").textContent = `${recordedFoodDays || "--"} / 7`;
   document.querySelector("#food-week-average").textContent = averageCalories === null ? "-- kcal" : `${Math.round(averageCalories)} kcal`;
   document.querySelector("#food-week-average-detail").textContent = calorieEntries.length ? `${calorieEntries.length}日の記録から計算` : "摂取カロリー平均";
 
@@ -2196,7 +2184,6 @@ function saveCurrentFoodAsPreset() {
     mealCalories: { ...mealCalories },
     meals: getMealsFromCalories(mealCalories),
     habits: [],
-    mood: "calm",
     note: String(formData.get("note") || "").trim(),
   });
   if (editingFoodPresetId) {
@@ -2253,7 +2240,7 @@ function renderFoodHistory() {
           <span>${getCalorieLabel(entry)}</span>
         </div>
         <div>${getMealLogLabel(entry.meals || [])} / ${getMealCaloriesLabel(entry)}</div>
-        <div>${getFoodHabits(entry).map(getFoodHabitLabel).join("・") || "健康チェックなし"}</div>
+        <div>${entry.note ? escapeHtml(entry.note) : "メモなし"}</div>
         <div class="history-actions">
           <button type="button" data-edit-entry="food" data-entry-date="${entry.date}">編集</button>
           <button type="button" data-delete-entry="food" data-entry-date="${entry.date}">削除</button>
@@ -2267,13 +2254,8 @@ function hasFoodEntry(entry) {
   return Boolean(entry && (
     numberOrNull(entry.intakeCalories) !== null
     || (entry.meals || []).length
-    || getFoodHabits(entry).length
     || entry.note
   ));
-}
-
-function getFoodHabits(entry) {
-  return (entry?.habits || []).filter((habit) => foodHabitValues.includes(habit));
 }
 
 function getMealCaloriesFromInputs() {
@@ -2326,16 +2308,6 @@ function getMealName(value) {
   return labels[value] || value;
 }
 
-function getFoodHabitLabel(value) {
-  const labels = {
-    water: "水分",
-    protein: "たんぱく質",
-    vegetables: "野菜・海藻",
-    no_snack: "間食控えめ",
-    slow_eating: "ゆっくり",
-  };
-  return labels[value] || value;
-}
 
 function setWeightMetric(valueSelector, detailSelector, value, detail) {
   const weight = numberOrNull(value);
@@ -2520,20 +2492,17 @@ function fillFoodFormForDate(date) {
 }
 
 function scoreEntry(entry) {
-  let score = 18;
-  score += Math.min((entry.meals || []).length, 4) * 8;
-  score += Math.min(entry.habits.length, 8) * 4;
-  if (entry.sleep !== null) {
-    score += entry.sleep >= 7 ? 20 : entry.sleep >= 6 ? 12 : 5;
-  }
-  if (entry.mood === "good" || entry.mood === "calm") score += 10;
-  return Math.min(100, score);
+  let score = 0;
+  if (hasWeightEntry(entry)) score += 25;
+  if (hasFoodEntry(entry)) score += 25;
+  if (hasExerciseEntry(entry)) score += 25;
+  if (numberOrNull(entry.sleep) !== null) score += 25;
+  return score;
 }
 
 function getHabitRatio(weekEntries) {
-  if (!weekEntries.length) return 0;
-  const done = weekEntries.reduce((sum, entry) => sum + entry.habits.length, 0);
-  return Math.round((done / (weekEntries.length * 8)) * 100);
+  const recordedDays = new Set(weekEntries.map((entry) => entry.date)).size;
+  return Math.round((recordedDays / 7) * 100);
 }
 
 function getRecentEntries(days) {
@@ -2579,9 +2548,9 @@ function getCalorieLabel(entry) {
 }
 
 function getScoreDetail(score) {
-  if (score === null) return "食事・運動・睡眠・気分";
+  if (score === null) return "体重・食事・運動・睡眠";
   if (score >= 85) return "今週はかなり安定";
-  if (score >= 70) return "健康行動が積み上がり中";
+  if (score >= 70) return "記録がしっかり続いています";
   if (score >= 55) return "小さな行動を増やしたい";
   return "まず睡眠と食事を整える";
 }
