@@ -157,13 +157,49 @@ button {
 
 .record-modal-card {
   width: min(760px, 100%);
+  max-width: 100%;
   max-height: calc(100vh - 36px);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--panel);
   box-shadow: 0 28px 80px rgba(20, 28, 38, 0.28);
   padding: clamp(20px, 4vw, 30px);
+}
+
+.record-modal-card > *,
+.record-modal-card label,
+.record-modal-card fieldset,
+.record-modal-card input,
+.record-modal-card select,
+.record-modal-card textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#exercise-form {
+  overflow-x: hidden;
+}
+
+#exercise-form .exercise-preset-list,
+#exercise-form .exercise-input-grid,
+#exercise-form .preset-save-row,
+#exercise-form .segmented,
+#exercise-form .checks {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#exercise-form .preset-card,
+#exercise-form .preset-apply-button {
+  min-width: 0;
+}
+
+#exercise-form .preset-apply-button strong,
+#exercise-form .preset-apply-button small,
+#exercise-form .preset-apply-button span {
+  overflow-wrap: anywhere;
 }
 
 .record-modal-card .primary-button {
@@ -1897,6 +1933,11 @@ legend {
 
   .preset-save-row {
     grid-template-columns: 1fr;
+  }
+
+  #exercise-form .preset-edit-actions,
+  #exercise-form .preset-edit-actions button {
+    width: 100%;
   }
 
   .hero-copy {
