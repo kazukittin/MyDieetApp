@@ -602,20 +602,30 @@
               </div>
               <div id="food-preset-list" class="food-preset-list" aria-label="食事プリセット"></div>
 
+              <fieldset class="control-group meal-selector-group">
+                <legend>入力する食事を選択</legend>
+                <div class="segmented meal-selector">
+                  <label><input type="radio" name="selectedMeal" value="breakfast" checked><span>朝</span></label>
+                  <label><input type="radio" name="selectedMeal" value="lunch"><span>昼</span></label>
+                  <label><input type="radio" name="selectedMeal" value="dinner"><span>夜</span></label>
+                  <label><input type="radio" name="selectedMeal" value="snack"><span>間食</span></label>
+                </div>
+              </fieldset>
+
               <div class="meal-calorie-grid">
-                <label class="field-card">
+                <label class="field-card meal-input-card" data-meal-input-card="breakfast">
                   <span>朝 kcal</span>
                   <input type="number" id="breakfast-calories" name="breakfastCalories" min="0" max="3000" step="1" placeholder="400" data-meal-calorie-input>
                 </label>
-                <label class="field-card">
+                <label class="field-card meal-input-card" data-meal-input-card="lunch" hidden>
                   <span>昼 kcal</span>
                   <input type="number" id="lunch-calories" name="lunchCalories" min="0" max="3000" step="1" placeholder="650" data-meal-calorie-input>
                 </label>
-                <label class="field-card">
+                <label class="field-card meal-input-card" data-meal-input-card="dinner" hidden>
                   <span>夜 kcal</span>
                   <input type="number" id="dinner-calories" name="dinnerCalories" min="0" max="3000" step="1" placeholder="700" data-meal-calorie-input>
                 </label>
-                <label class="field-card">
+                <label class="field-card meal-input-card" data-meal-input-card="snack" hidden>
                   <span>間食 kcal</span>
                   <input type="number" id="snack-calories" name="snackCalories" min="0" max="2000" step="1" placeholder="150" data-meal-calorie-input>
                 </label>

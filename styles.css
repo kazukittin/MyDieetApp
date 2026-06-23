@@ -235,6 +235,29 @@ button {
   min-width: 0;
 }
 
+.meal-selector {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.meal-selector label,
+.meal-selector span {
+  width: 100%;
+}
+
+.meal-selector span {
+  justify-content: center;
+}
+
+.meal-input-card[hidden] {
+  display: none;
+}
+
+.meal-calorie-grid .meal-input-card,
+.meal-calorie-grid .meal-total-card {
+  grid-column: 1 / -1;
+}
+
 .record-modal-card .primary-button {
   width: 100%;
 }

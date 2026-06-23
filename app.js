@@ -460,6 +460,9 @@ cancelFoodPresetEditButton.addEventListener("click", cancelFoodPresetEdit);
 document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
   input.addEventListener("input", updateIntakeCaloriesTotal);
 });
+foodForm.querySelectorAll('input[name="selectedMeal"]').forEach((input) => {
+  input.addEventListener("change", () => showSelectedMealInput(input.value));
+});
 closeSettingsButton.addEventListener("click", closeSettings);
 settingsTabButtons.forEach((button) => {
   button.addEventListener("click", () => switchSettingsTab(button.dataset.settingsTab));
@@ -2169,6 +2172,10 @@ function applyFoodPreset(preset) {
   foodForm.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
     checkbox.checked = preset.meals.includes(checkbox.value);
   });
+  const selectedMeal = preset.meals.find((meal) => numberOrNull(preset.mealCalories[meal]) !== null)
+    || preset.meals[0]
+    || "breakfast";
+  selectMealInput(selectedMeal);
   document.querySelector("#note").value = preset.note;
   updateIntakeCaloriesTotal();
 }
@@ -2275,6 +2282,18 @@ function getMealCaloriesFromInputs() {
     values[meal] = numberOrNull(input?.value);
   });
   return values;
+}
+
+function selectMealInput(meal) {
+  const input = foodForm.querySelector(`input[name="selectedMeal"][value="${meal}"]`);
+  if (input) input.checked = true;
+  showSelectedMealInput(meal);
+}
+
+function showSelectedMealInput(meal) {
+  foodForm.querySelectorAll("[data-meal-input-card]").forEach((card) => {
+    card.hidden = card.dataset.mealInputCard !== meal;
+  });
 }
 
 function getMealCaloriesTotal(mealCalories = {}) {
@@ -2496,6 +2515,7 @@ function fillFoodFormForDate(date) {
   document.querySelector("#snack-calories").value = mealCalories.snack ?? "";
   document.querySelector("#intake-calories").value = entry?.intakeCalories ?? "";
   document.querySelector("#note").value = entry?.note ?? "";
+  selectMealInput(getMealsFromCalories(mealCalories)[0] || "breakfast");
 }
 
 function scoreEntry(entry) {
