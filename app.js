@@ -175,14 +175,13 @@ foodForm.addEventListener("submit", (event) => {
   const date = formData.get("date");
   setSaveFeedback("food", "saving", "保存しています...");
   const entry = getOrCreateEntry(date);
-  const selectedFood = formData.getAll("habits").filter((habit) => foodHabitValues.includes(habit));
   const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
   entry.mealCalories = getMealCaloriesFromForm(formData);
   entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
   entry.meals = getMealsFromCalories(entry.mealCalories);
-  entry.meal = deriveMealScore(entry.meals, selectedFood);
-  entry.habits = [...new Set([...preservedExercise, ...selectedFood])];
-  entry.mood = formData.get("mood");
+  entry.meal = deriveMealScore(entry.meals, []);
+  entry.habits = preservedExercise;
+  entry.mood = "calm";
   entry.note = String(formData.get("note") || "").trim();
   commitEntry(entry);
   saveEntries();
@@ -2154,10 +2153,6 @@ function applyFoodPreset(preset) {
   foodForm.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
     checkbox.checked = preset.meals.includes(checkbox.value);
   });
-  foodForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
-    checkbox.checked = preset.habits.includes(checkbox.value);
-  });
-  document.querySelector("#mood").value = preset.mood;
   document.querySelector("#note").value = preset.note;
   updateIntakeCaloriesTotal();
 }
@@ -2175,8 +2170,8 @@ function saveCurrentFoodAsPreset() {
     name,
     mealCalories: getMealCaloriesFromForm(formData),
     meals: getMealsFromCalories(getMealCaloriesFromForm(formData)),
-    habits: formData.getAll("habits"),
-    mood: formData.get("mood"),
+    habits: [],
+    mood: "calm",
     note: String(formData.get("note") || "").trim(),
   });
   if (editingFoodPresetId) {
@@ -2492,14 +2487,7 @@ function fillFoodFormForDate(date) {
   document.querySelector("#dinner-calories").value = mealCalories.dinner ?? "";
   document.querySelector("#snack-calories").value = mealCalories.snack ?? "";
   document.querySelector("#intake-calories").value = entry?.intakeCalories ?? "";
-  document.querySelector("#mood").value = entry?.mood || "calm";
   document.querySelector("#note").value = entry?.note ?? "";
-  foodForm.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
-    checkbox.checked = (entry?.meals || []).includes(checkbox.value);
-  });
-  foodForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
-    checkbox.checked = (entry?.habits || []).includes(checkbox.value);
-  });
 }
 
 function scoreEntry(entry) {
