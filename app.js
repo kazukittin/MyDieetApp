@@ -145,7 +145,6 @@ weightForm.addEventListener("submit", (event) => {
   saveEntries();
   render();
   setSaveFeedback("weight", "success", getSaveSuccessMessage("weight"));
-  window.setTimeout(closeWeightModal, 350);
 });
 
 exerciseForm.addEventListener("submit", (event) => {
@@ -166,7 +165,6 @@ exerciseForm.addEventListener("submit", (event) => {
   saveEntries();
   render();
   setSaveFeedback("exercise", "success", getSaveSuccessMessage("exercise"));
-  window.setTimeout(() => closeEntryModal(exerciseModal), 350);
 });
 
 foodForm.addEventListener("submit", (event) => {
@@ -187,7 +185,6 @@ foodForm.addEventListener("submit", (event) => {
   saveEntries();
   render();
   setSaveFeedback("food", "success", getSaveSuccessMessage("food"));
-  window.setTimeout(() => closeEntryModal(foodModal), 350);
 });
 
 weightDateInput.addEventListener("change", () => {
