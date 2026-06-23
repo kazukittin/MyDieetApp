@@ -110,6 +110,8 @@ const dirtyEntryDates = new Set();
 let settingsDirty = false;
 let editingExercisePresetId = null;
 let editingFoodPresetId = null;
+let selectedFoodMeal = "breakfast";
+let foodMealNotesDraft = createEmptyMealNotes();
 
 [weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
   input.value = isoToday;
@@ -179,7 +181,9 @@ foodForm.addEventListener("submit", (event) => {
   entry.meals = getMealsFromCalories(entry.mealCalories);
   entry.meal = deriveMealScore(entry.meals, []);
   entry.habits = preservedExercise;
-  entry.note = String(formData.get("note") || "").trim();
+  saveCurrentMealNote();
+  entry.mealNotes = { ...foodMealNotesDraft };
+  entry.note = "";
   commitEntry(entry);
   saveEntries();
   render();
@@ -458,7 +462,7 @@ document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
   input.addEventListener("input", updateIntakeCaloriesTotal);
 });
 foodForm.querySelectorAll('input[name="selectedMeal"]').forEach((input) => {
-  input.addEventListener("change", () => showSelectedMealInput(input.value));
+  input.addEventListener("change", () => changeSelectedMeal(input.value));
 });
 closeSettingsButton.addEventListener("click", closeSettings);
 settingsTabButtons.forEach((button) => {
@@ -647,6 +651,7 @@ function getOrCreateEntry(date) {
     meal: previous?.meal ?? 2,
     meals: previous?.meals ?? [],
     habits: previous?.habits ?? [],
+    mealNotes: normalizeMealNotes(previous?.mealNotes, previous?.note, previous?.meals),
     note: previous?.note ?? "",
     updatedAt: new Date().toISOString(),
   };
@@ -719,7 +724,8 @@ function normalizeFoodPreset(preset) {
     name: String(preset.name || preset.label || "").trim().slice(0, 40),
     mealCalories: preset.mealCalories && typeof preset.mealCalories === "object" ? preset.mealCalories : {},
     meals: Array.isArray(preset.meals) ? preset.meals : (preset.meal ? [preset.meal] : []),
-    note: typeof preset.note === "string" ? preset.note : "",
+    mealNotes: normalizeMealNotes(preset.mealNotes, preset.note, preset.meals),
+    note: "",
   };
 }
 
@@ -1085,6 +1091,7 @@ function deleteEntryScope(scope, date) {
     entry.mealCalories = {};
     entry.meal = 2;
     entry.meals = [];
+    entry.mealNotes = createEmptyMealNotes();
     entry.note = "";
   }
 
@@ -2164,8 +2171,8 @@ function applyFoodPreset(preset) {
   const selectedMeal = preset.meals.find((meal) => numberOrNull(preset.mealCalories[meal]) !== null)
     || preset.meals[0]
     || "breakfast";
+  foodMealNotesDraft = normalizeMealNotes(preset.mealNotes, preset.note, preset.meals);
   selectMealInput(selectedMeal);
-  document.querySelector("#note").value = preset.note;
   updateIntakeCaloriesTotal();
 }
 
@@ -2178,13 +2185,15 @@ function saveCurrentFoodAsPreset() {
   }
   const formData = new FormData(foodForm);
   const mealCalories = getMealCaloriesFromInputs();
+  saveCurrentMealNote();
   const preset = normalizeFoodPreset({
     id: editingFoodPresetId || createId(),
     name,
     mealCalories: { ...mealCalories },
     meals: getMealsFromCalories(mealCalories),
     habits: [],
-    note: String(formData.get("note") || "").trim(),
+    mealNotes: { ...foodMealNotesDraft },
+    note: "",
   });
   if (editingFoodPresetId) {
     foodPresets = foodPresets.map((item) => item.id === editingFoodPresetId ? preset : item);
@@ -2240,7 +2249,7 @@ function renderFoodHistory() {
           <span>${getCalorieLabel(entry)}</span>
         </div>
         <div>${getMealLogLabel(entry.meals || [])} / ${getMealCaloriesLabel(entry)}</div>
-        <div>${entry.note ? escapeHtml(entry.note) : "メモなし"}</div>
+        <div>${getMealNotesLabel(entry)}</div>
         <div class="history-actions">
           <button type="button" data-edit-entry="food" data-entry-date="${entry.date}">編集</button>
           <button type="button" data-delete-entry="food" data-entry-date="${entry.date}">削除</button>
@@ -2254,8 +2263,16 @@ function hasFoodEntry(entry) {
   return Boolean(entry && (
     numberOrNull(entry.intakeCalories) !== null
     || (entry.meals || []).length
-    || entry.note
+    || Object.values(normalizeMealNotes(entry.mealNotes, entry.note, entry.meals)).some(Boolean)
   ));
+}
+
+function getMealNotesLabel(entry) {
+  const notes = normalizeMealNotes(entry.mealNotes, entry.note, entry.meals);
+  const labels = Object.entries(notes)
+    .filter(([, note]) => note)
+    .map(([meal, note]) => `${getMealName(meal)}: ${escapeHtml(note)}`);
+  return labels.length ? labels.join(" / ") : "メモなし";
 }
 
 function getMealCaloriesFromInputs() {
@@ -2270,13 +2287,44 @@ function getMealCaloriesFromInputs() {
 function selectMealInput(meal) {
   const input = foodForm.querySelector(`input[name="selectedMeal"][value="${meal}"]`);
   if (input) input.checked = true;
+  selectedFoodMeal = meal;
   showSelectedMealInput(meal);
+  document.querySelector("#food-note-label").textContent = `${getMealName(meal)}のメモ`;
+  document.querySelector("#note").value = foodMealNotesDraft[meal] || "";
+}
+
+function changeSelectedMeal(meal) {
+  saveCurrentMealNote();
+  selectMealInput(meal);
+}
+
+function saveCurrentMealNote() {
+  const noteInput = document.querySelector("#note");
+  if (!noteInput) return;
+  foodMealNotesDraft[selectedFoodMeal] = noteInput.value.trim();
 }
 
 function showSelectedMealInput(meal) {
   foodForm.querySelectorAll("[data-meal-input-card]").forEach((card) => {
     card.hidden = card.dataset.mealInputCard !== meal;
   });
+}
+
+function createEmptyMealNotes() {
+  return { breakfast: "", lunch: "", dinner: "", snack: "" };
+}
+
+function normalizeMealNotes(mealNotes, legacyNote = "", meals = []) {
+  const normalized = createEmptyMealNotes();
+  if (mealNotes && typeof mealNotes === "object") {
+    Object.keys(normalized).forEach((meal) => {
+      normalized[meal] = typeof mealNotes[meal] === "string" ? mealNotes[meal] : "";
+    });
+  }
+  if (!Object.values(normalized).some(Boolean) && legacyNote) {
+    normalized[meals?.[0] || "breakfast"] = String(legacyNote);
+  }
+  return normalized;
 }
 
 function getMealCaloriesTotal(mealCalories = {}) {
@@ -2487,8 +2535,8 @@ function fillFoodFormForDate(date) {
   document.querySelector("#dinner-calories").value = mealCalories.dinner ?? "";
   document.querySelector("#snack-calories").value = mealCalories.snack ?? "";
   document.querySelector("#intake-calories").value = entry?.intakeCalories ?? "";
-  document.querySelector("#note").value = entry?.note ?? "";
-  selectMealInput(getMealsFromCalories(mealCalories)[0] || "breakfast");
+  foodMealNotesDraft = normalizeMealNotes(entry?.mealNotes, entry?.note, entry?.meals);
+  selectMealInput(getMealsFromCalories(mealCalories)[0] || selectedFoodMeal || "breakfast");
 }
 
 function scoreEntry(entry) {
