@@ -176,7 +176,7 @@ foodForm.addEventListener("submit", (event) => {
   setSaveFeedback("food", "saving", "保存しています...");
   const entry = getOrCreateEntry(date);
   const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
-  entry.mealCalories = getMealCaloriesFromForm(formData);
+  entry.mealCalories = getMealCaloriesFromInputs();
   entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
   entry.meals = getMealsFromCalories(entry.mealCalories);
   entry.meal = deriveMealScore(entry.meals, []);
@@ -2165,11 +2165,12 @@ function saveCurrentFoodAsPreset() {
     return;
   }
   const formData = new FormData(foodForm);
+  const mealCalories = getMealCaloriesFromInputs();
   const preset = normalizeFoodPreset({
     id: editingFoodPresetId || createId(),
     name,
-    mealCalories: getMealCaloriesFromForm(formData),
-    meals: getMealsFromCalories(getMealCaloriesFromForm(formData)),
+    mealCalories: { ...mealCalories },
+    meals: getMealsFromCalories(mealCalories),
     habits: [],
     mood: "calm",
     note: String(formData.get("note") || "").trim(),
@@ -2251,22 +2252,13 @@ function getFoodHabits(entry) {
   return (entry?.habits || []).filter((habit) => foodHabitValues.includes(habit));
 }
 
-function getMealCaloriesFromForm(formData) {
-  return {
-    breakfast: numberOrNull(formData.get("breakfastCalories")),
-    lunch: numberOrNull(formData.get("lunchCalories")),
-    dinner: numberOrNull(formData.get("dinnerCalories")),
-    snack: numberOrNull(formData.get("snackCalories")),
-  };
-}
-
 function getMealCaloriesFromInputs() {
-  return {
-    breakfast: numberOrNull(document.querySelector("#breakfast-calories")?.value),
-    lunch: numberOrNull(document.querySelector("#lunch-calories")?.value),
-    dinner: numberOrNull(document.querySelector("#dinner-calories")?.value),
-    snack: numberOrNull(document.querySelector("#snack-calories")?.value),
-  };
+  const values = {};
+  ["breakfast", "lunch", "dinner", "snack"].forEach((meal) => {
+    const input = foodForm.querySelector(`#${meal}-calories`);
+    values[meal] = numberOrNull(input?.value);
+  });
+  return values;
 }
 
 function getMealCaloriesTotal(mealCalories = {}) {
