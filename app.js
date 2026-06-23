@@ -1018,13 +1018,23 @@ function switchRecordModal(scope) {
   if (scope === "weight") {
     openWeightModal();
   } else if (scope === "exercise") {
-    openEntryModal(exerciseModal, "exercise");
+    openEntryModal(exerciseModal, "exercise", false);
   } else {
-    openEntryModal(foodModal, "food");
+    openEntryModal(foodModal, "food", false);
   }
 }
 
-function openEntryModal(modal, scope) {
+function openEntryModal(modal, scope, reloadSavedData = true) {
+  if (reloadSavedData && scope === "exercise") {
+    const date = exerciseDateInput.value || isoToday;
+    exerciseDateInput.value = date;
+    fillExerciseFormForDate(date);
+  }
+  if (reloadSavedData && scope === "food") {
+    const date = foodDateInput.value || isoToday;
+    foodDateInput.value = date;
+    fillFoodFormForDate(date);
+  }
   modal.hidden = false;
   document.body.classList.add("modal-open");
   modal.querySelector(".modal-form-close")?.focus();
