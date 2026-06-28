@@ -169,7 +169,6 @@ weightForm.addEventListener("submit", (event) => {
   entry.weightMorning = numberOrNull(formData.get("weightMorning"));
   entry.weightNight = numberOrNull(formData.get("weightNight"));
   entry.weight = getPrimaryWeight(entry);
-  entry.sleep = numberOrNull(formData.get("sleep"));
   commitEntry(entry);
   saveEntries();
   render();
@@ -1195,7 +1194,6 @@ function fillWeightFieldsForDate(date) {
   document.querySelector("#weight-morning").value = entry?.weightMorning
     ?? (entry && (entry.weightNight === null || entry.weightNight === undefined) ? entry.weight ?? "" : "");
   document.querySelector("#weight-night").value = entry?.weightNight ?? "";
-  document.querySelector("#sleep").value = entry?.sleep ?? "";
 }
 
 function mergeEntries(localEntries, serverEntries) {
