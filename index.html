@@ -500,6 +500,13 @@
                 <select id="exercise-type" name="exerciseType">
                   <option value="">選択なし</option>
                   <option value="walk">ウォーキング</option>
+                  <option value="run">ランニング</option>
+                  <option value="cycle">サイクリング</option>
+                  <option value="swim">水泳</option>
+                  <option value="dance">ダンス</option>
+                  <option value="yoga">ヨガ</option>
+                  <option value="stretch">ストレッチ</option>
+                  <option value="strength">筋力トレーニング</option>
                   <option value="chest">胸</option>
                   <option value="back">背中</option>
                   <option value="shoulders">肩</option>
@@ -526,6 +533,17 @@
                   <label><input type="checkbox" name="habits" value="strength"><span>筋トレ</span></label>
                 </div>
               </fieldset>
+              <button id="add-exercise-item" class="ghost-button entry-add-button" type="button">この運動を追加</button>
+              <section class="entry-item-section" aria-labelledby="exercise-items-title">
+                <div class="entry-item-heading">
+                  <div>
+                    <span>今日行った運動</span>
+                    <strong id="exercise-items-title">複数の運動をまとめて記録</strong>
+                  </div>
+                  <span id="exercise-items-total">0分 / 0kcal</span>
+                </div>
+                <div id="exercise-item-list" class="entry-item-list"></div>
+              </section>
               <label>
                 <span>運動メモ</span>
                 <textarea id="exercise-note" name="exerciseNote" rows="3" placeholder="例: 夕方に30分歩いた。膝は問題なし。"></textarea>
@@ -612,6 +630,44 @@
                 </div>
               </fieldset>
 
+              <section class="food-item-composer" aria-labelledby="food-item-composer-title">
+                <div class="entry-item-heading">
+                  <div>
+                    <span>食べたもの</span>
+                    <strong id="food-item-composer-title">1品ずつ追加</strong>
+                  </div>
+                  <span id="selected-meal-item-count">0品</span>
+                </div>
+                <div class="food-item-input-grid">
+                  <label class="food-name-field">
+                    <span>料理・食品名</span>
+                    <input id="food-item-name" type="text" maxlength="60" placeholder="例: ごはん、焼き鮭、みそ汁">
+                  </label>
+                  <label>
+                    <span>量</span>
+                    <input id="food-item-amount" type="text" maxlength="30" placeholder="例: 1杯">
+                  </label>
+                  <label>
+                    <span>kcal</span>
+                    <input id="food-item-calories" type="number" min="0" max="3000" step="1" placeholder="250">
+                  </label>
+                  <label>
+                    <span>たんぱく質 g</span>
+                    <input id="food-item-protein" type="number" min="0" max="500" step="0.1" placeholder="0">
+                  </label>
+                  <label>
+                    <span>脂質 g</span>
+                    <input id="food-item-fat" type="number" min="0" max="500" step="0.1" placeholder="0">
+                  </label>
+                  <label>
+                    <span>炭水化物 g</span>
+                    <input id="food-item-carbs" type="number" min="0" max="1000" step="0.1" placeholder="0">
+                  </label>
+                </div>
+                <button id="add-food-item" class="ghost-button entry-add-button" type="button">選択中の食事に追加</button>
+                <div id="food-item-list" class="entry-item-list"></div>
+              </section>
+
               <div class="meal-calorie-grid">
                 <label class="field-card meal-input-card" data-meal-input-card="breakfast">
                   <span>朝 kcal</span>
@@ -633,6 +689,11 @@
                   <span>合計 kcal</span>
                   <input type="number" id="intake-calories" name="intakeCalories" min="0" max="8000" step="1" placeholder="0" readonly>
                 </label>
+              </div>
+              <div id="food-nutrition-summary" class="nutrition-summary" aria-label="栄養素の合計">
+                <div><span>たんぱく質</span><strong id="food-protein-total">0g</strong></div>
+                <div><span>脂質</span><strong id="food-fat-total">0g</strong></div>
+                <div><span>炭水化物</span><strong id="food-carbs-total">0g</strong></div>
               </div>
 
               <label>

@@ -1259,6 +1259,113 @@ h2 {
   background: var(--green-soft);
 }
 
+.entry-add-button {
+  width: 100%;
+  margin: 2px 0 12px;
+}
+
+.entry-item-section,
+.food-item-composer {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  padding: 14px;
+}
+
+.entry-item-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entry-item-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.entry-item-heading span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.entry-item-list {
+  display: grid;
+  gap: 8px;
+}
+
+.entry-item-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 10px 12px;
+}
+
+.entry-item-card > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.entry-item-card span,
+.entry-item-card small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.entry-item-card button {
+  border: 0;
+  background: transparent;
+  color: var(--coral);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.entry-item-empty {
+  margin: 0;
+  padding: 8px 0;
+}
+
+.food-item-input-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.food-item-input-grid .food-name-field {
+  grid-column: span 2;
+}
+
+.nutrition-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.nutrition-summary div {
+  display: grid;
+  gap: 4px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  padding: 10px;
+  text-align: center;
+}
+
+.nutrition-summary span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
 .preset-card {
   min-height: 94px;
   display: grid;
@@ -2107,6 +2214,10 @@ legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .food-item-input-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .today-card {
     grid-template-columns: 1fr auto;
     align-items: center;
@@ -2208,6 +2319,15 @@ legend {
   #food-form .food-preset-list,
   #food-form .meal-calorie-grid {
     grid-template-columns: 1fr;
+  }
+
+  .food-item-input-grid,
+  .nutrition-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .food-item-input-grid .food-name-field {
+    grid-column: auto;
   }
 
   .panel,
