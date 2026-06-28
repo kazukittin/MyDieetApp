@@ -113,6 +113,14 @@ const defaultFoodPresets = [
   { meal: "dinner", label: "夜の定番", calories: 700, habits: ["vegetables", "slow_eating"], note: "夜はゆっくり食べて整える。" },
   { meal: "snack", label: "間食控えめ", calories: 150, habits: ["no_snack"], note: "間食は軽めにする。" },
 ];
+const defaultExercisePresets = [
+  { id: "starter-walk-30", name: "30分ウォーキング", type: "walk", minutes: 30, intensity: "normal", autoBurn: true },
+  { id: "starter-run-20", name: "20分ランニング", type: "run", minutes: 20, intensity: "normal", autoBurn: true },
+  { id: "starter-cycle-30", name: "30分サイクリング", type: "cycle", minutes: 30, intensity: "normal", autoBurn: true },
+  { id: "starter-stretch-10", name: "10分ストレッチ", type: "stretch", minutes: 10, intensity: "light", autoBurn: true },
+  { id: "starter-strength-30", name: "30分筋トレ", type: "strength", minutes: 30, intensity: "normal", autoBurn: true },
+  { id: "starter-yoga-20", name: "20分ヨガ", type: "yoga", minutes: 20, intensity: "light", autoBurn: true },
+];
 
 let activeUser = null;
 let authMode = "login";
@@ -645,10 +653,10 @@ function loadProfile() {
 function loadExercisePresets() {
   try {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(exercisePresetStorageKey)));
-    if (!Array.isArray(stored)) return [];
+    if (!Array.isArray(stored) || !stored.length) return getDefaultExercisePresets();
     return stored.map(normalizeExercisePreset).filter((preset) => preset.name);
   } catch {
-    return [];
+    return getDefaultExercisePresets();
   }
 }
 
@@ -718,7 +726,7 @@ function commitEntry(entry) {
 }
 
 function getDefaultExercisePresets() {
-  return [];
+  return defaultExercisePresets.map(normalizeExercisePreset);
 }
 
 function normalizeExercisePreset(preset) {
@@ -728,6 +736,7 @@ function normalizeExercisePreset(preset) {
     type: typeof preset.type === "string" ? preset.type : "",
     minutes: numberOrNull(preset.minutes) ?? 0,
     burnCalories: numberOrNull(preset.burnCalories) ?? 0,
+    autoBurn: preset.autoBurn === true,
     intensity: ["light", "normal", "hard"].includes(preset.intensity) ? preset.intensity : "normal",
     habits: Array.isArray(preset.habits) ? preset.habits.filter((habit) => exerciseHabitValues.includes(habit)) : [],
     note: typeof preset.note === "string" ? preset.note : "",
@@ -763,7 +772,9 @@ function getDefaultFoodPresets() {
 function loadFoodPresets() {
   try {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(foodPresetStorageKey)));
-    return Array.isArray(stored) ? stored.map(normalizeFoodPreset).filter((preset) => preset.name) : getDefaultFoodPresets();
+    return Array.isArray(stored) && stored.length
+      ? stored.map(normalizeFoodPreset).filter((preset) => preset.name)
+      : getDefaultFoodPresets();
   } catch {
     return getDefaultFoodPresets();
   }
@@ -1252,9 +1263,11 @@ async function syncFromCloud() {
       if (cloudSettings?.payload && new Date(cloudSettings.updated_at) >= new Date(settingsUpdatedAt)) {
         profile = cloudSettings.payload.profile || {};
         exercisePresets = Array.isArray(cloudSettings.payload.exercisePresets)
+          && cloudSettings.payload.exercisePresets.length
           ? cloudSettings.payload.exercisePresets.map(normalizeExercisePreset).filter((preset) => preset.name)
-          : [];
+          : getDefaultExercisePresets();
         foodPresets = Array.isArray(cloudSettings.payload.foodPresets)
+          && cloudSettings.payload.foodPresets.length
           ? cloudSettings.payload.foodPresets.map(normalizeFoodPreset).filter((preset) => preset.name)
           : getDefaultFoodPresets();
         settingsUpdatedAt = cloudSettings.updated_at;
@@ -1949,7 +1962,7 @@ function renderExercisePresets() {
         <button class="preset-apply-button" type="button" data-preset-id="${escapeHtml(preset.id)}">
           <span>${escapeHtml(preset.name)}</span>
           <strong>${getExerciseTypeLabel(preset.type)}</strong>
-          <small>${preset.minutes}分 / ${preset.burnCalories}kcal / ${getExerciseIntensityLabel(preset.intensity)}</small>
+          <small>${preset.minutes}分 / ${preset.autoBurn ? "消費は自動計算" : `${preset.burnCalories}kcal`} / ${getExerciseIntensityLabel(preset.intensity)}</small>
         </button>
         <div class="preset-card-actions">
           <button type="button" data-edit-preset-id="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を編集">編集</button>
@@ -1998,7 +2011,10 @@ function escapeHtml(value) {
 function applyExercisePreset(preset) {
   if (!preset) return;
   document.querySelector("#exercise-minutes").value = preset.minutes;
-  document.querySelector("#burn-calories").value = preset.burnCalories;
+  const burnInput = document.querySelector("#burn-calories");
+  burnInput.value = preset.autoBurn ? "" : preset.burnCalories;
+  if (preset.autoBurn) delete burnInput.dataset.manual;
+  else burnInput.dataset.manual = "true";
   setExerciseTypeValue(preset.type);
   const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${preset.intensity}"]`);
   if (intensityInput) intensityInput.checked = true;
@@ -2006,6 +2022,7 @@ function applyExercisePreset(preset) {
   exerciseForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
     if (exerciseHabitValues.includes(checkbox.value)) checkbox.checked = preset.habits.includes(checkbox.value);
   });
+  if (preset.autoBurn) updateEstimatedBurnCalories();
 }
 
 function saveCurrentExerciseAsPreset() {
@@ -2022,6 +2039,7 @@ function saveCurrentExerciseAsPreset() {
     type: document.querySelector("#exercise-type")?.value || "",
     minutes: document.querySelector("#exercise-minutes")?.value || 0,
     burnCalories: document.querySelector("#burn-calories")?.value || 0,
+    autoBurn: false,
     intensity: document.querySelector('input[name="exerciseIntensity"]:checked')?.value || "normal",
     habits: Array.from(exerciseForm.querySelectorAll('input[name="habits"]:checked'))
       .map((checkbox) => checkbox.value)
@@ -2333,18 +2351,18 @@ function renderFoodPresets() {
 
 function applyFoodPreset(preset) {
   if (!preset) return;
-  foodMealItemsDraft = normalizeMealItems(preset.mealItems);
-  ["breakfast", "lunch", "dinner", "snack"].forEach((meal) => {
-    document.querySelector(`#${meal}-calories`).value = preset.mealCalories[meal] ?? "";
+  const sourceMeals = preset.meals?.length ? preset.meals : ["breakfast"];
+  const targets = sourceMeals.length === 1
+    ? [{ source: sourceMeals[0], target: selectedFoodMeal }]
+    : sourceMeals.map((meal) => ({ source: meal, target: meal }));
+  const presetItems = normalizeMealItems(preset.mealItems);
+  const presetNotes = normalizeMealNotes(preset.mealNotes, preset.note, sourceMeals);
+  targets.forEach(({ source, target }) => {
+    foodMealItemsDraft[target] = presetItems[source].map((item) => ({ ...item, id: createId() }));
+    document.querySelector(`#${target}-calories`).value = preset.mealCalories[source] ?? "";
+    foodMealNotesDraft[target] = presetNotes[source] || "";
   });
-  foodForm.querySelectorAll('input[name="meals"]').forEach((checkbox) => {
-    checkbox.checked = preset.meals.includes(checkbox.value);
-  });
-  const selectedMeal = preset.meals.find((meal) => numberOrNull(preset.mealCalories[meal]) !== null)
-    || preset.meals[0]
-    || "breakfast";
-  foodMealNotesDraft = normalizeMealNotes(preset.mealNotes, preset.note, preset.meals);
-  selectMealInput(selectedMeal);
+  selectMealInput(targets[0].target);
   renderFoodItems();
   updateIntakeCaloriesTotal();
   updateNutritionSummary();
@@ -2357,17 +2375,25 @@ function saveCurrentFoodAsPreset() {
     foodPresetNameInput.focus();
     return;
   }
-  const formData = new FormData(foodForm);
-  const mealCalories = getMealCaloriesFromInputs();
+  const allMealCalories = getMealCaloriesWithItems(foodMealItemsDraft);
+  const selectedCalories = allMealCalories[selectedFoodMeal];
   saveCurrentMealNote();
+  if (selectedCalories === null && !foodMealItemsDraft[selectedFoodMeal].length && !foodMealNotesDraft[selectedFoodMeal]) {
+    setSaveFeedback("food", "error", "選択中の食事内容を入力してからプリセットに追加してください。");
+    return;
+  }
+  const presetMealItems = createEmptyMealItems();
+  presetMealItems[selectedFoodMeal] = foodMealItemsDraft[selectedFoodMeal].map((item) => ({ ...item, id: createId() }));
+  const presetMealNotes = createEmptyMealNotes();
+  presetMealNotes[selectedFoodMeal] = foodMealNotesDraft[selectedFoodMeal];
   const preset = normalizeFoodPreset({
     id: editingFoodPresetId || createId(),
     name,
-    mealCalories: { ...mealCalories },
-    mealItems: normalizeMealItems(foodMealItemsDraft),
-    meals: getMealsFromCalories(mealCalories),
+    mealCalories: { [selectedFoodMeal]: selectedCalories },
+    mealItems: presetMealItems,
+    meals: [selectedFoodMeal],
     habits: [],
-    mealNotes: { ...foodMealNotesDraft },
+    mealNotes: presetMealNotes,
     note: "",
   });
   if (editingFoodPresetId) {
@@ -2387,6 +2413,7 @@ function saveCurrentFoodAsPreset() {
 function beginFoodPresetEdit(preset) {
   if (!preset) return;
   editingFoodPresetId = preset.id;
+  selectMealInput(preset.meals?.[0] || "breakfast");
   applyFoodPreset(preset);
   foodPresetNameInput.value = preset.name;
   saveFoodPresetButton.textContent = "プリセットを更新";
@@ -2397,7 +2424,7 @@ function beginFoodPresetEdit(preset) {
 function cancelFoodPresetEdit() {
   editingFoodPresetId = null;
   foodPresetNameInput.value = "";
-  saveFoodPresetButton.textContent = "現在の内容をプリセットに追加";
+  saveFoodPresetButton.textContent = "選択中の食事をプリセットに追加";
   cancelFoodPresetEditButton.hidden = true;
 }
 
