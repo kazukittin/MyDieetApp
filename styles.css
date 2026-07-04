@@ -1242,6 +1242,53 @@ h2 {
   padding: 12px;
 }
 
+.exercise-preset-builder {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.exercise-preset-builder .preset-edit-actions {
+  grid-column: 1 / -1;
+}
+
+.preset-builder-heading {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 2px;
+}
+
+.preset-builder-heading span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selected-preset-card {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--blue-soft);
+  padding: 14px;
+}
+
+.selected-preset-card span,
+.selected-preset-card small {
+  color: var(--muted);
+}
+
+.selected-preset-card span {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.exercise-preset-card.is-selected {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px var(--green-soft);
+}
+
 .food-preset-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

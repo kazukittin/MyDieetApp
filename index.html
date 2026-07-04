@@ -485,30 +485,11 @@
               <p class="preset-help">よく行う運動を登録し、カードを押して今日の運動へ入力できます。</p>
               <div id="exercise-preset-list" class="exercise-preset-list" aria-label="登録した運動プリセット"></div>
 
-              <label>
-                <span>運動名</span>
-                <input type="text" id="exercise-name" name="exerciseName" maxlength="60" placeholder="例: ウォーキング、スクワット">
-              </label>
-              <fieldset class="control-group exercise-base-group">
-                <legend>カロリーの基準量</legend>
-                <div class="segmented exercise-base-selector">
-                  <label><input type="radio" name="exerciseBase" value="minute:1"><span>1分</span></label>
-                  <label><input type="radio" name="exerciseBase" value="minute:5"><span>5分</span></label>
-                  <label><input type="radio" name="exerciseBase" value="minute:10" checked><span>10分</span></label>
-                  <label><input type="radio" name="exerciseBase" value="rep:5"><span>5回</span></label>
-                  <label><input type="radio" name="exerciseBase" value="rep:10"><span>10回</span></label>
-                </div>
-              </fieldset>
-              <div class="field-row exercise-calorie-grid">
-                <label class="field-card">
-                  <span>基準量あたり kcal</span>
-                  <input type="number" id="exercise-base-calories" min="0" max="5000" step="1" placeholder="50">
-                </label>
-                <label class="field-card calculated-exercise-card">
-                  <span>合計消費 kcal</span>
-                  <input type="number" id="burn-calories" name="burnCalories" readonly>
-                </label>
-              </div>
+              <section id="selected-exercise-preset" class="selected-preset-card" aria-live="polite">
+                <span>選択中のプリセット</span>
+                <strong id="selected-exercise-preset-name">プリセットを選択してください</strong>
+                <small id="selected-exercise-preset-detail">カードを選ぶと実施量を設定できます。</small>
+              </section>
               <fieldset class="control-group exercise-multiplier-group">
                 <legend>行った時間・回数（倍ずつ増加）</legend>
                 <div class="segmented exercise-multiplier-selector">
@@ -531,16 +512,34 @@
                 </div>
                 <div id="exercise-item-list" class="entry-item-list"></div>
               </section>
-              <div class="preset-save-row">
+              <section class="preset-save-row exercise-preset-builder" aria-labelledby="exercise-preset-builder-title">
+                <div class="preset-builder-heading">
+                  <span>Preset builder</span>
+                  <strong id="exercise-preset-builder-title">プリセットを作成</strong>
+                </div>
                 <label>
-                  <span>プリセット名</span>
-                  <input id="exercise-preset-name" type="text" maxlength="40" placeholder="例: 朝のウォーキング">
+                  <span>運動名</span>
+                  <input id="exercise-preset-name" type="text" maxlength="60" placeholder="例: ウォーキング、スクワット">
+                </label>
+                <label>
+                  <span>基準量</span>
+                  <select id="exercise-preset-base">
+                    <option value="minute:1">1分</option>
+                    <option value="minute:5">5分</option>
+                    <option value="minute:10" selected>10分</option>
+                    <option value="rep:5">5回</option>
+                    <option value="rep:10">10回</option>
+                  </select>
+                </label>
+                <label>
+                  <span>基準消費 kcal</span>
+                  <input id="exercise-preset-calories" type="number" min="0" max="5000" step="1" placeholder="50">
                 </label>
                 <div class="preset-edit-actions">
-                  <button id="save-exercise-preset" class="ghost-button" type="button">現在の内容をプリセットに追加</button>
+                  <button id="save-exercise-preset" class="ghost-button" type="button">プリセットを作成</button>
                   <button id="cancel-exercise-preset-edit" class="text-button" type="button" hidden>編集をキャンセル</button>
                 </div>
-              </div>
+              </section>
               <button class="primary-button" type="submit" data-save-scope="exercise">運動を保存</button>
               <p id="exercise-save-feedback" class="save-feedback" role="status" aria-live="polite">今日できた運動を選んで保存できます。</p>
             </form>
