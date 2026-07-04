@@ -1595,7 +1595,7 @@ function renderSummary() {
   const habitRatio = getHabitRatio(weekEntries);
   document.querySelector("#habit-progress").style.width = `${habitRatio}%`;
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
-  renderGoalSummary(latestWithWeight);
+  renderPfcSummary(selected);
   renderWeeklyReport(weekEntries);
 }
 
@@ -1776,30 +1776,34 @@ function renderWeeklyAverage(weekEntries) {
     : "体重を記録すると表示";
 }
 
-function renderGoalSummary(latestWithWeight) {
-  const remaining = document.querySelector("#goal-remaining");
-  const detail = document.querySelector("#goal-detail");
-  if (!profile.goalWeight || !latestWithWeight) {
-    remaining.textContent = "-- kg";
-    detail.textContent = "初回設定で表示されます";
+function renderPfcSummary(entry) {
+  const items = Object.values(normalizeMealItems(entry?.mealItems)).flat();
+  const protein = items.reduce((sum, item) => sum + (numberOrNull(item.protein) || 0), 0);
+  const fat = items.reduce((sum, item) => sum + (numberOrNull(item.fat) || 0), 0);
+  const carbs = items.reduce((sum, item) => sum + (numberOrNull(item.carbs) || 0), 0);
+  const calories = { protein: protein * 4, fat: fat * 9, carbs: carbs * 4 };
+  const total = calories.protein + calories.fat + calories.carbs;
+  const bar = document.querySelector("#pfc-summary-bar");
+  const detail = document.querySelector("#pfc-summary-detail");
+  const values = { protein, fat, carbs };
+
+  Object.entries(values).forEach(([key, grams]) => {
+    const percent = total ? Math.round((calories[key] / total) * 100) : 0;
+    document.querySelector(`#pfc-${key}-bar`).style.width = `${percent}%`;
+    document.querySelector(`#pfc-${key}-label`).textContent = total ? `${Math.round(grams * 10) / 10}g` : "--";
+  });
+
+  if (!total) {
+    bar.setAttribute("aria-label", "PFCは未入力です");
+    detail.textContent = "今日のPFCを入力すると表示";
     return;
   }
 
-  const latestWeight = getPrimaryWeight(latestWithWeight);
-  const diff = latestWeight - profile.goalWeight;
-  const absolute = Math.abs(diff).toFixed(1);
-  remaining.textContent = diff > 0 ? `${absolute} kg` : "達成中";
-
-  if (profile.startWeight) {
-    const total = Math.abs(profile.startWeight - profile.goalWeight);
-    const done = Math.min(total, Math.max(0, Math.abs(profile.startWeight - latestWeight)));
-    const percent = total ? Math.round((done / total) * 100) : 100;
-    const targetDate = getEstimatedTargetDate(profile.startWeight, profile.goalWeight, profile.pace, profile.startDate);
-    detail.textContent = targetDate ? `開始から${percent}% / 目安 ${targetDate}` : `開始から${percent}%進行`;
-    return;
-  }
-
-  detail.textContent = `目標 ${profile.goalWeight.toFixed(1)}kg`;
+  const proteinPercent = Math.round((calories.protein / total) * 100);
+  const fatPercent = Math.round((calories.fat / total) * 100);
+  const carbsPercent = Math.max(0, 100 - proteinPercent - fatPercent);
+  bar.setAttribute("aria-label", `たんぱく質${proteinPercent}%、脂質${fatPercent}%、炭水化物${carbsPercent}%`);
+  detail.textContent = `P ${proteinPercent}%・F ${fatPercent}%・C ${carbsPercent}%`;
 }
 
 function renderHistory() {

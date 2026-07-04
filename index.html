@@ -292,10 +292,19 @@
                 <strong id="weekly-score">--</strong>
                 <small id="weekly-score-detail">体重・食事・運動・睡眠</small>
               </article>
-              <article class="metric">
-                <span>目標まで</span>
-                <strong id="goal-remaining">-- kg</strong>
-                <small id="goal-detail">初回設定で表示されます</small>
+              <article class="metric pfc-metric">
+                <span>PFCバランス</span>
+                <div id="pfc-summary-bar" class="pfc-summary-bar" role="img" aria-label="PFCは未入力です">
+                  <i id="pfc-protein-bar" class="pfc-protein-bar"></i>
+                  <i id="pfc-fat-bar" class="pfc-fat-bar"></i>
+                  <i id="pfc-carbs-bar" class="pfc-carbs-bar"></i>
+                </div>
+                <div class="pfc-summary-labels">
+                  <span><i class="pfc-protein-dot"></i>P <strong id="pfc-protein-label">--</strong></span>
+                  <span><i class="pfc-fat-dot"></i>F <strong id="pfc-fat-label">--</strong></span>
+                  <span><i class="pfc-carbs-dot"></i>C <strong id="pfc-carbs-label">--</strong></span>
+                </div>
+                <small id="pfc-summary-detail">今日のPFCを入力すると表示</small>
               </article>
             </div>
           </section>

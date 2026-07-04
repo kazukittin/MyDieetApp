@@ -1480,8 +1480,65 @@ h2 {
   line-height: 1.1;
 }
 
-.goal-metric {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), var(--coral-soft));
+.pfc-metric {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), var(--blue-soft));
+}
+
+.pfc-summary-bar {
+  display: flex;
+  width: 100%;
+  height: 13px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8edf1;
+}
+
+.pfc-summary-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  transition: width 220ms ease;
+}
+
+.pfc-protein-bar,
+.pfc-protein-dot {
+  background: var(--green);
+}
+
+.pfc-fat-bar,
+.pfc-fat-dot {
+  background: var(--coral);
+}
+
+.pfc-carbs-bar,
+.pfc-carbs-dot {
+  background: var(--blue);
+}
+
+.pfc-summary-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+}
+
+.pfc-summary-labels > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pfc-summary-labels > span > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.pfc-summary-labels strong {
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 .dashboard-grid {
