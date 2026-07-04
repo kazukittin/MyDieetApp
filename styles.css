@@ -183,7 +183,7 @@ button {
 }
 
 #exercise-form .exercise-preset-list,
-#exercise-form .exercise-input-grid,
+#exercise-form .exercise-calorie-grid,
 #exercise-form .preset-save-row,
 #exercise-form .segmented,
 #exercise-form .checks {
@@ -1619,8 +1619,35 @@ form {
   grid-template-columns: 1fr;
 }
 
-.exercise-input-grid {
+.exercise-input-grid,
+.exercise-calorie-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.calculated-exercise-card {
+  background: var(--green-soft);
+}
+
+.calculation-preview {
+  margin: -2px 0 14px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 1.05rem;
+  font-weight: 850;
+  padding: 11px 14px;
+  text-align: center;
+}
+
+.exercise-base-selector label,
+.exercise-multiplier-selector label {
+  flex: 1 1 72px;
+}
+
+.exercise-base-selector span,
+.exercise-multiplier-selector span {
+  width: 100%;
+  justify-content: center;
 }
 
 label {
@@ -2181,7 +2208,8 @@ legend {
 
   .exercise-summary-grid,
   .food-summary-grid,
-  .exercise-input-grid {
+  .exercise-input-grid,
+  .exercise-calorie-grid {
     grid-template-columns: 1fr;
   }
 

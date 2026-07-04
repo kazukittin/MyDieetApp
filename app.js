@@ -89,24 +89,6 @@ const supabaseClient = hasSupabaseConfig() && window.supabase
   ? window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey)
   : null;
 const exerciseHabitValues = ["walk", "stretch", "strength"];
-const exerciseMetValues = {
-  walk: 3.5,
-  run: 8.3,
-  cycle: 6.8,
-  swim: 6.0,
-  dance: 5.0,
-  yoga: 2.5,
-  stretch: 2.3,
-  strength: 5.0,
-  chest: 5.0,
-  back: 5.0,
-  shoulders: 4.5,
-  arms: 4.0,
-  abs: 4.0,
-  legs: 5.5,
-  hips: 4.5,
-  full_body: 6.0,
-};
 const defaultFoodPresets = [
   { meal: "breakfast", label: "朝の定番", calories: 420, habits: ["water", "protein"], note: "朝はたんぱく質を入れる。" },
   { meal: "lunch", label: "昼の定番", calories: 650, habits: ["protein", "vegetables"], note: "昼は主食と野菜を揃える。" },
@@ -114,12 +96,11 @@ const defaultFoodPresets = [
   { meal: "snack", label: "間食控えめ", calories: 150, habits: ["no_snack"], note: "間食は軽めにする。" },
 ];
 const defaultExercisePresets = [
-  { id: "starter-walk-30", name: "30分ウォーキング", type: "walk", minutes: 30, intensity: "normal", autoBurn: true },
-  { id: "starter-run-20", name: "20分ランニング", type: "run", minutes: 20, intensity: "normal", autoBurn: true },
-  { id: "starter-cycle-30", name: "30分サイクリング", type: "cycle", minutes: 30, intensity: "normal", autoBurn: true },
-  { id: "starter-stretch-10", name: "10分ストレッチ", type: "stretch", minutes: 10, intensity: "light", autoBurn: true },
-  { id: "starter-strength-30", name: "30分筋トレ", type: "strength", minutes: 30, intensity: "normal", autoBurn: true },
-  { id: "starter-yoga-20", name: "20分ヨガ", type: "yoga", minutes: 20, intensity: "light", autoBurn: true },
+  { id: "starter-walk", name: "ウォーキング", exerciseName: "ウォーキング", baseUnit: "minute", baseAmount: 10, caloriesPerBase: null },
+  { id: "starter-stretch", name: "ストレッチ", exerciseName: "ストレッチ", baseUnit: "minute", baseAmount: 5, caloriesPerBase: null },
+  { id: "starter-squat", name: "スクワット", exerciseName: "スクワット", baseUnit: "rep", baseAmount: 10, caloriesPerBase: null },
+  { id: "starter-pushup", name: "腕立て伏せ", exerciseName: "腕立て伏せ", baseUnit: "rep", baseAmount: 5, caloriesPerBase: null },
+  { id: "starter-abs", name: "腹筋", exerciseName: "腹筋", baseUnit: "rep", baseAmount: 10, caloriesPerBase: null },
 ];
 
 let activeUser = null;
@@ -188,23 +169,21 @@ exerciseForm.addEventListener("submit", (event) => {
   const formData = new FormData(exerciseForm);
   const date = formData.get("date");
   const currentItem = getExerciseItemFromForm();
-  if (currentItem && (!currentItem.type || currentItem.minutes === null)) {
-    setSaveFeedback("exercise", "error", "運動タイプと運動時間を入力してください。");
-    (!currentItem.type ? document.querySelector("#exercise-type") : document.querySelector("#exercise-minutes")).focus();
+  if (hasExerciseComposerValue() && !currentItem) {
+    setSaveFeedback("exercise", "error", "運動名と基準量あたりのカロリーを入力してください。");
     return;
   }
   setSaveFeedback("exercise", "saving", "保存しています...");
   const entry = getOrCreateEntry(date);
-  const selectedExercise = formData.getAll("habits").filter((habit) => exerciseHabitValues.includes(habit));
   const items = [...exerciseItemsDraft];
   if (currentItem) items.push(currentItem);
   entry.exerciseItems = normalizeExerciseItems(items);
   entry.burnCalories = sumExerciseItems(entry.exerciseItems, "burnCalories");
   entry.exerciseMinutes = sumExerciseItems(entry.exerciseItems, "minutes");
-  entry.exerciseType = entry.exerciseItems[0]?.type || "";
-  entry.exerciseIntensity = entry.exerciseItems[0]?.intensity || "normal";
+  entry.exerciseName = entry.exerciseItems[0]?.name || "";
+  entry.exerciseType = "";
   entry.exerciseNote = String(formData.get("exerciseNote") || "").trim();
-  entry.habits = selectedExercise;
+  entry.habits = [];
   commitEntry(entry);
   saveEntries();
   render();
@@ -221,13 +200,12 @@ foodForm.addEventListener("submit", (event) => {
   const date = formData.get("date");
   setSaveFeedback("food", "saving", "保存しています...");
   const entry = getOrCreateEntry(date);
-  const preservedExercise = entry.habits.filter((habit) => exerciseHabitValues.includes(habit));
   entry.mealItems = normalizeMealItems(foodMealItemsDraft);
   entry.mealCalories = getMealCaloriesWithItems(entry.mealItems);
   entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
   entry.meals = getMealsFromCalories(entry.mealCalories);
   entry.meal = deriveMealScore(entry.meals, []);
-  entry.habits = preservedExercise;
+  entry.habits = entry.habits.filter((habit) => !exerciseHabitValues.includes(habit));
   saveCurrentMealNote();
   entry.mealNotes = { ...foodMealNotesDraft };
   entry.note = "";
@@ -510,13 +488,9 @@ document.querySelectorAll("[data-meal-calorie-input]").forEach((input) => {
 });
 addExerciseItemButton.addEventListener("click", addCurrentExerciseItem);
 addFoodItemButton.addEventListener("click", addCurrentFoodItem);
-document.querySelector("#exercise-type").addEventListener("change", updateEstimatedBurnCalories);
-document.querySelector("#exercise-minutes").addEventListener("input", updateEstimatedBurnCalories);
-exerciseForm.querySelectorAll('input[name="exerciseIntensity"]').forEach((input) => {
-  input.addEventListener("change", updateEstimatedBurnCalories);
-});
-document.querySelector("#burn-calories").addEventListener("input", (event) => {
-  event.target.dataset.manual = "true";
+document.querySelector("#exercise-base-calories").addEventListener("input", updateExerciseCalculation);
+exerciseForm.querySelectorAll('input[name="exerciseBase"], input[name="exerciseMultiplier"]').forEach((input) => {
+  input.addEventListener("change", updateExerciseCalculation);
 });
 foodForm.querySelectorAll('input[name="selectedMeal"]').forEach((input) => {
   input.addEventListener("change", () => changeSelectedMeal(input.value));
@@ -580,7 +554,6 @@ onboardingForm.addEventListener("submit", (event) => {
       burnCalories: null,
       exerciseMinutes: null,
       exerciseType: "",
-      exerciseIntensity: "normal",
       exerciseNote: "",
       meal: 3,
       meals: [],
@@ -704,7 +677,7 @@ function getOrCreateEntry(date) {
     burnCalories: previous?.burnCalories ?? null,
     exerciseMinutes: previous?.exerciseMinutes ?? null,
     exerciseType: previous?.exerciseType ?? "",
-    exerciseIntensity: previous?.exerciseIntensity ?? "normal",
+    exerciseName: previous?.exerciseName ?? "",
     exerciseNote: previous?.exerciseNote ?? "",
     exerciseItems: normalizeExerciseItems(previous?.exerciseItems),
     meal: previous?.meal ?? 2,
@@ -730,15 +703,23 @@ function getDefaultExercisePresets() {
 }
 
 function normalizeExercisePreset(preset) {
+  const legacyMinutes = numberOrNull(preset.minutes);
+  const baseUnit = preset.baseUnit === "rep" ? "rep" : "minute";
+  const allowedBaseAmounts = baseUnit === "rep" ? [5, 10] : [1, 5, 10];
+  const requestedBaseAmount = numberOrNull(preset.baseAmount);
+  const baseAmount = allowedBaseAmounts.includes(requestedBaseAmount)
+    ? requestedBaseAmount
+    : (baseUnit === "minute" && legacyMinutes !== null ? (legacyMinutes >= 10 ? 10 : legacyMinutes >= 5 ? 5 : 1) : allowedBaseAmounts[0]);
+  const legacyBurn = numberOrNull(preset.burnCalories);
+  const caloriesPerBase = numberOrNull(preset.caloriesPerBase)
+    ?? (legacyBurn !== null && legacyMinutes ? Math.round((legacyBurn / legacyMinutes) * baseAmount) : null);
   return {
     id: typeof preset.id === "string" ? preset.id : createId(),
     name: normalizeExercisePresetName(preset),
-    type: typeof preset.type === "string" ? preset.type : "",
-    minutes: numberOrNull(preset.minutes) ?? 0,
-    burnCalories: numberOrNull(preset.burnCalories) ?? 0,
-    autoBurn: preset.autoBurn === true,
-    intensity: ["light", "normal", "hard"].includes(preset.intensity) ? preset.intensity : "normal",
-    habits: Array.isArray(preset.habits) ? preset.habits.filter((habit) => exerciseHabitValues.includes(habit)) : [],
+    exerciseName: String(preset.exerciseName || (preset.type ? getExerciseTypeLabel(preset.type) : "") || preset.name || "").trim().slice(0, 60),
+    baseUnit,
+    baseAmount,
+    caloriesPerBase,
     note: typeof preset.note === "string" ? preset.note : "",
   };
 }
@@ -1148,7 +1129,7 @@ function deleteEntryScope(scope, date) {
     entry.burnCalories = null;
     entry.exerciseMinutes = null;
     entry.exerciseType = "";
-    entry.exerciseIntensity = "normal";
+    entry.exerciseName = "";
     entry.exerciseNote = "";
     entry.exerciseItems = [];
     entry.habits = entry.habits.filter((habit) => !exerciseHabitValues.includes(habit));
@@ -1928,18 +1909,22 @@ function renderExercisePage() {
   const weekEntries = getRecentEntries(7);
   const exerciseEntries = weekEntries.filter(hasExerciseEntry);
   const totalMinutes = exerciseEntries.reduce((sum, entry) => sum + (entry.exerciseMinutes || 0), 0);
+  const totalReps = exerciseEntries.reduce((sum, entry) => (
+    sum + (sumExerciseItems(normalizeExerciseItems(entry.exerciseItems), "reps") || 0)
+  ), 0);
   const totalBurn = exerciseEntries.reduce((sum, entry) => sum + (entry.burnCalories || 0), 0);
   const todayEntry = entries.find((entry) => entry.date === isoToday);
 
   renderExercisePresets();
-  document.querySelector("#exercise-week-minutes").textContent = totalMinutes ? `${Math.round(totalMinutes)} 分` : "-- 分";
-  document.querySelector("#exercise-week-minutes-detail").textContent = exerciseEntries.length ? `${exerciseEntries.length}日の記録から計算` : "時間を入れると表示";
+  const weeklyAmount = [totalMinutes ? `${Math.round(totalMinutes)}分` : "", totalReps ? `${Math.round(totalReps)}回` : ""].filter(Boolean).join("・");
+  document.querySelector("#exercise-week-minutes").textContent = weeklyAmount || "--";
+  document.querySelector("#exercise-week-minutes-detail").textContent = exerciseEntries.length ? `${exerciseEntries.length}日の記録から計算` : "時間・回数を入れると表示";
   document.querySelector("#exercise-week-burn").textContent = totalBurn ? `${Math.round(totalBurn)} kcal` : "-- kcal";
   document.querySelector("#exercise-week-burn-detail").textContent = exerciseEntries.length ? "直近7日の合計" : "消費カロリーから計算";
   document.querySelector("#exercise-week-days").textContent = exerciseEntries.length ? `${exerciseEntries.length} 日` : "-- 日";
 
   if (hasExerciseEntry(todayEntry)) {
-    document.querySelector("#exercise-today-status").textContent = todayEntry.exerciseType ? getExerciseTypeLabel(todayEntry.exerciseType) : "入力済み";
+    document.querySelector("#exercise-today-status").textContent = getExerciseEntryName(todayEntry);
     document.querySelector("#exercise-today-detail").textContent = getExerciseDetailLabel(todayEntry);
   } else {
     document.querySelector("#exercise-today-status").textContent = "未入力";
@@ -1961,8 +1946,8 @@ function renderExercisePresets() {
       <article class="preset-card exercise-preset-card">
         <button class="preset-apply-button" type="button" data-preset-id="${escapeHtml(preset.id)}">
           <span>${escapeHtml(preset.name)}</span>
-          <strong>${getExerciseTypeLabel(preset.type)}</strong>
-          <small>${preset.minutes}分 / ${preset.autoBurn ? "消費は自動計算" : `${preset.burnCalories}kcal`} / ${getExerciseIntensityLabel(preset.intensity)}</small>
+          <strong>${escapeHtml(preset.exerciseName)}</strong>
+          <small>${preset.baseAmount}${getExerciseUnitLabel(preset.baseUnit)}あたり / ${preset.caloriesPerBase === null ? "カロリー未設定" : `${preset.caloriesPerBase}kcal`}</small>
         </button>
         <div class="preset-card-actions">
           <button type="button" data-edit-preset-id="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を編集">編集</button>
@@ -2010,19 +1995,12 @@ function escapeHtml(value) {
 
 function applyExercisePreset(preset) {
   if (!preset) return;
-  document.querySelector("#exercise-minutes").value = preset.minutes;
-  const burnInput = document.querySelector("#burn-calories");
-  burnInput.value = preset.autoBurn ? "" : preset.burnCalories;
-  if (preset.autoBurn) delete burnInput.dataset.manual;
-  else burnInput.dataset.manual = "true";
-  setExerciseTypeValue(preset.type);
-  const intensityInput = document.querySelector(`input[name="exerciseIntensity"][value="${preset.intensity}"]`);
-  if (intensityInput) intensityInput.checked = true;
+  document.querySelector("#exercise-name").value = preset.exerciseName;
+  setExerciseBaseValue(preset.baseUnit, preset.baseAmount);
+  document.querySelector("#exercise-base-calories").value = preset.caloriesPerBase ?? "";
+  setExerciseMultiplierValue(1);
   document.querySelector("#exercise-note").value = preset.note;
-  exerciseForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
-    if (exerciseHabitValues.includes(checkbox.value)) checkbox.checked = preset.habits.includes(checkbox.value);
-  });
-  if (preset.autoBurn) updateEstimatedBurnCalories();
+  updateExerciseCalculation();
 }
 
 function saveCurrentExerciseAsPreset() {
@@ -2036,16 +2014,16 @@ function saveCurrentExerciseAsPreset() {
   const preset = normalizeExercisePreset({
     id: editingExercisePresetId || createId(),
     name,
-    type: document.querySelector("#exercise-type")?.value || "",
-    minutes: document.querySelector("#exercise-minutes")?.value || 0,
-    burnCalories: document.querySelector("#burn-calories")?.value || 0,
-    autoBurn: false,
-    intensity: document.querySelector('input[name="exerciseIntensity"]:checked')?.value || "normal",
-    habits: Array.from(exerciseForm.querySelectorAll('input[name="habits"]:checked'))
-      .map((checkbox) => checkbox.value)
-      .filter((habit) => exerciseHabitValues.includes(habit)),
+    exerciseName: document.querySelector("#exercise-name")?.value || "",
+    ...getSelectedExerciseBase(),
+    caloriesPerBase: document.querySelector("#exercise-base-calories")?.value,
     note: document.querySelector("#exercise-note")?.value.trim() || "",
   });
+
+  if (!preset.exerciseName || preset.caloriesPerBase === null) {
+    setSaveFeedback("exercise", "error", "運動名と基準量あたりのカロリーを入力してください。");
+    return;
+  }
 
   if (editingExercisePresetId) {
     exercisePresets = exercisePresets.map((item) => item.id === editingExercisePresetId ? preset : item);
@@ -2086,73 +2064,88 @@ function syncExercisePresets() {
   }
 }
 
-function setExerciseTypeValue(value) {
-  const select = document.querySelector("#exercise-type");
-  if (!select) return;
-  const option = Array.from(select.options).find((item) => item.value === value);
-  select.value = option ? value : "";
-}
-
 function normalizeExerciseItems(items) {
   if (!Array.isArray(items)) return [];
   return items
-    .map((item) => ({
-      id: typeof item?.id === "string" ? item.id : createId(),
-      type: typeof item?.type === "string" ? item.type : "",
-      minutes: numberOrNull(item?.minutes),
-      burnCalories: numberOrNull(item?.burnCalories),
-      intensity: ["light", "normal", "hard"].includes(item?.intensity) ? item.intensity : "normal",
-    }))
-    .filter((item) => item.type || item.minutes !== null || item.burnCalories !== null);
+    .map((item) => {
+      const legacyMinutes = numberOrNull(item?.minutes);
+      const baseUnit = item?.baseUnit === "rep" ? "rep" : "minute";
+      const baseAmount = numberOrNull(item?.baseAmount) ?? (legacyMinutes || 1);
+      const multiplier = numberOrNull(item?.multiplier) ?? 1;
+      const amount = numberOrNull(item?.amount) ?? baseAmount * multiplier;
+      const burnCalories = numberOrNull(item?.burnCalories);
+      const caloriesPerBase = numberOrNull(item?.caloriesPerBase)
+        ?? (burnCalories !== null && multiplier ? burnCalories / multiplier : null);
+      return {
+        id: typeof item?.id === "string" ? item.id : createId(),
+        name: String(item?.name || (item?.type ? getExerciseTypeLabel(item.type) : "") || "運動").trim().slice(0, 60),
+        baseUnit,
+        baseAmount,
+        multiplier,
+        amount,
+        caloriesPerBase,
+        minutes: baseUnit === "minute" ? amount : null,
+        reps: baseUnit === "rep" ? amount : null,
+        burnCalories: burnCalories ?? (caloriesPerBase === null ? null : Math.round(caloriesPerBase * multiplier)),
+      };
+    })
+    .filter((item) => item.name && item.amount > 0);
 }
 
 function hasLegacyExerciseValues(entry) {
   return Boolean(entry && (
-    entry.exerciseType
+    entry.exerciseName
+    || entry.exerciseType
     || numberOrNull(entry.exerciseMinutes) !== null
     || numberOrNull(entry.burnCalories) !== null
   ));
 }
 
 function getExerciseItemFromForm() {
-  const type = document.querySelector("#exercise-type").value;
-  const minutes = numberOrNull(document.querySelector("#exercise-minutes").value);
-  const burnCalories = numberOrNull(document.querySelector("#burn-calories").value);
-  if (!type && minutes === null && burnCalories === null) return null;
+  const name = document.querySelector("#exercise-name").value.trim();
+  const caloriesPerBase = numberOrNull(document.querySelector("#exercise-base-calories").value);
+  if (!name || caloriesPerBase === null) return null;
+  const { baseUnit, baseAmount } = getSelectedExerciseBase();
+  const multiplier = getSelectedExerciseMultiplier();
   return normalizeExerciseItems([{
-    type,
-    minutes,
-    burnCalories,
-    intensity: document.querySelector('input[name="exerciseIntensity"]:checked')?.value || "normal",
+    name,
+    baseUnit,
+    baseAmount,
+    multiplier,
+    amount: baseAmount * multiplier,
+    caloriesPerBase,
+    burnCalories: caloriesPerBase * multiplier,
   }])[0] || null;
+}
+
+function hasExerciseComposerValue() {
+  return Boolean(
+    document.querySelector("#exercise-name").value.trim()
+    || document.querySelector("#exercise-base-calories").value.trim()
+  );
 }
 
 function addCurrentExerciseItem() {
   const item = getExerciseItemFromForm();
-  if (!item?.type) {
-    setSaveFeedback("exercise", "error", "運動タイプを選択してください。");
-    document.querySelector("#exercise-type").focus();
-    return;
-  }
-  if (item.minutes === null) {
-    setSaveFeedback("exercise", "error", "運動時間を入力してください。");
-    document.querySelector("#exercise-minutes").focus();
+  if (!item) {
+    setSaveFeedback("exercise", "error", "運動名と基準量あたりのカロリーを入力してください。");
+    (!document.querySelector("#exercise-name").value.trim()
+      ? document.querySelector("#exercise-name")
+      : document.querySelector("#exercise-base-calories")).focus();
     return;
   }
   exerciseItemsDraft.push(item);
   clearExerciseItemComposer();
   renderExerciseItems();
-  setSaveFeedback("exercise", "success", `${getExerciseTypeLabel(item.type)}を追加しました。`);
+  setSaveFeedback("exercise", "success", `${item.name}を追加しました。`);
 }
 
 function clearExerciseItemComposer() {
-  document.querySelector("#exercise-minutes").value = "";
-  const burnInput = document.querySelector("#burn-calories");
-  burnInput.value = "";
-  delete burnInput.dataset.manual;
-  setExerciseTypeValue("");
-  const intensityInput = exerciseForm.querySelector('input[name="exerciseIntensity"][value="normal"]');
-  if (intensityInput) intensityInput.checked = true;
+  document.querySelector("#exercise-name").value = "";
+  document.querySelector("#exercise-base-calories").value = "";
+  setExerciseBaseValue("minute", 10);
+  setExerciseMultiplierValue(1);
+  updateExerciseCalculation();
 }
 
 function renderExerciseItems() {
@@ -2163,10 +2156,10 @@ function renderExerciseItems() {
     exerciseItemList.innerHTML = exerciseItemsDraft.map((item) => `
       <article class="entry-item-card">
         <div>
-          <strong>${escapeHtml(getExerciseTypeLabel(item.type))}</strong>
-          <span>${item.minutes ?? 0}分・${item.burnCalories ?? 0}kcal・${getExerciseIntensityLabel(item.intensity)}</span>
+          <strong>${escapeHtml(item.name)}</strong>
+          <span>${item.amount}${getExerciseUnitLabel(item.baseUnit)}・${item.burnCalories ?? 0}kcal</span>
         </div>
-        <button type="button" data-remove-exercise-item="${escapeHtml(item.id)}" aria-label="${escapeHtml(getExerciseTypeLabel(item.type))}を削除">削除</button>
+        <button type="button" data-remove-exercise-item="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)}を削除">削除</button>
       </article>
     `).join("");
     exerciseItemList.querySelectorAll("[data-remove-exercise-item]").forEach((button) => {
@@ -2176,7 +2169,10 @@ function renderExerciseItems() {
       });
     });
   }
-  exerciseItemsTotal.textContent = `${sumExerciseItems(exerciseItemsDraft, "minutes") ?? 0}分 / ${sumExerciseItems(exerciseItemsDraft, "burnCalories") ?? 0}kcal`;
+  const minutes = sumExerciseItems(exerciseItemsDraft, "minutes") ?? 0;
+  const reps = sumExerciseItems(exerciseItemsDraft, "reps") ?? 0;
+  const amountText = [minutes ? `${minutes}分` : "", reps ? `${reps}回` : ""].filter(Boolean).join("・") || "0分";
+  exerciseItemsTotal.textContent = `${amountText} / ${sumExerciseItems(exerciseItemsDraft, "burnCalories") ?? 0}kcal`;
 }
 
 function sumExerciseItems(items, key) {
@@ -2184,20 +2180,43 @@ function sumExerciseItems(items, key) {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0)) : null;
 }
 
-function updateEstimatedBurnCalories() {
-  const burnInput = document.querySelector("#burn-calories");
-  if (burnInput.dataset.manual === "true") return;
-  const type = document.querySelector("#exercise-type").value;
-  const minutes = numberOrNull(document.querySelector("#exercise-minutes").value);
-  if (!type || minutes === null) {
-    burnInput.value = "";
-    return;
-  }
-  const intensity = document.querySelector('input[name="exerciseIntensity"]:checked')?.value || "normal";
-  const intensityFactor = { light: 0.8, normal: 1, hard: 1.2 }[intensity];
-  const latestWeight = getPrimaryWeight(entries.find(hasWeightEntry)) ?? numberOrNull(profile.startWeight) ?? 60;
-  const calories = (exerciseMetValues[type] || 4) * intensityFactor * 3.5 * latestWeight / 200 * minutes;
-  burnInput.value = String(Math.max(0, Math.round(calories)));
+function getSelectedExerciseBase() {
+  const value = exerciseForm.querySelector('input[name="exerciseBase"]:checked')?.value || "minute:10";
+  const [baseUnit, amount] = value.split(":");
+  return { baseUnit, baseAmount: Number(amount) };
+}
+
+function getSelectedExerciseMultiplier() {
+  return Number(exerciseForm.querySelector('input[name="exerciseMultiplier"]:checked')?.value || 1);
+}
+
+function setExerciseBaseValue(unit, amount) {
+  const input = exerciseForm.querySelector(`input[name="exerciseBase"][value="${unit}:${amount}"]`)
+    || exerciseForm.querySelector('input[name="exerciseBase"][value="minute:10"]');
+  if (input) input.checked = true;
+}
+
+function setExerciseMultiplierValue(multiplier) {
+  const input = exerciseForm.querySelector(`input[name="exerciseMultiplier"][value="${multiplier}"]`)
+    || exerciseForm.querySelector('input[name="exerciseMultiplier"][value="1"]');
+  if (input) input.checked = true;
+}
+
+function getExerciseUnitLabel(unit) {
+  return unit === "rep" ? "回" : "分";
+}
+
+function updateExerciseCalculation() {
+  const { baseUnit, baseAmount } = getSelectedExerciseBase();
+  const multiplier = getSelectedExerciseMultiplier();
+  const caloriesPerBase = numberOrNull(document.querySelector("#exercise-base-calories").value);
+  const totalCalories = caloriesPerBase === null ? null : Math.round(caloriesPerBase * multiplier);
+  exerciseForm.querySelectorAll('input[name="exerciseMultiplier"]').forEach((input) => {
+    const label = input.parentElement.querySelector("[data-exercise-multiplier-label]");
+    if (label) label.textContent = `${baseAmount * Number(input.value)}${getExerciseUnitLabel(baseUnit)}`;
+  });
+  document.querySelector("#burn-calories").value = totalCalories ?? "";
+  document.querySelector("#exercise-calculation-preview").textContent = `${baseAmount * multiplier}${getExerciseUnitLabel(baseUnit)}・${totalCalories ?? 0}kcal`;
 }
 
 function renderExerciseHistory() {
@@ -2214,7 +2233,7 @@ function renderExerciseHistory() {
       <article class="exercise-history-item">
         <div>
           <strong>${formatDateLabel(entry.date)}</strong>
-          <span>${getExerciseTypeLabel(entry.exerciseType)} / ${getExerciseIntensityLabel(entry.exerciseIntensity)}</span>
+          <span>${escapeHtml(getExerciseEntryName(entry))}</span>
         </div>
         <div>${getExerciseDetailLabel(entry)}</div>
         <div class="history-actions">
@@ -2232,22 +2251,24 @@ function hasExerciseEntry(entry) {
     ||
     numberOrNull(entry.burnCalories) !== null
     || numberOrNull(entry.exerciseMinutes) !== null
+    || entry.exerciseName
     || entry.exerciseType
-    || getExerciseHabits(entry).length
   ));
 }
 
-function getExerciseHabits(entry) {
-  return (entry?.habits || []).filter((habit) => exerciseHabitValues.includes(habit));
+function getExerciseEntryName(entry) {
+  const firstItem = normalizeExerciseItems(entry?.exerciseItems)[0];
+  return firstItem?.name || entry?.exerciseName || (entry?.exerciseType ? getExerciseTypeLabel(entry.exerciseType) : "入力済み");
 }
 
 function getExerciseDetailLabel(entry) {
-  const minutes = entry.exerciseMinutes === null || entry.exerciseMinutes === undefined ? "--分" : `${Math.round(entry.exerciseMinutes)}分`;
   const burn = entry.burnCalories === null || entry.burnCalories === undefined ? "--kcal" : `${Math.round(entry.burnCalories)}kcal`;
-  const itemNames = normalizeExerciseItems(entry.exerciseItems).map((item) => getExerciseTypeLabel(item.type)).filter(Boolean);
-  const habits = getExerciseHabits(entry).map(getExerciseTypeLabel).filter(Boolean);
-  const labels = [...new Set([...itemNames, ...habits])].join("・");
-  return labels ? `${minutes} / ${burn} / ${labels}` : `${minutes} / ${burn}`;
+  const items = normalizeExerciseItems(entry.exerciseItems);
+  if (items.length) {
+    return `${items.map((item) => `${escapeHtml(item.name)} ${item.amount}${getExerciseUnitLabel(item.baseUnit)}`).join("・")} / ${burn}`;
+  }
+  const minutes = entry.exerciseMinutes === null || entry.exerciseMinutes === undefined ? "--分" : `${Math.round(entry.exerciseMinutes)}分`;
+  return `${minutes} / ${burn}`;
 }
 
 function getExerciseTypeLabel(value) {
@@ -2271,11 +2292,6 @@ function getExerciseTypeLabel(value) {
     other: "その他",
   };
   return labels[value] || "運動";
-}
-
-function getExerciseIntensityLabel(value) {
-  const labels = { light: "軽め", normal: "普通", hard: "きつめ" };
-  return labels[value] || "普通";
 }
 
 function renderFoodPage() {
@@ -2859,17 +2875,14 @@ function fillExerciseFormForDate(date) {
   exerciseItemsDraft = normalizeExerciseItems(entry?.exerciseItems);
   if (!exerciseItemsDraft.length && hasLegacyExerciseValues(entry)) {
     exerciseItemsDraft = normalizeExerciseItems([{
+      name: entry.exerciseName || getExerciseTypeLabel(entry.exerciseType),
       type: entry.exerciseType,
       minutes: entry.exerciseMinutes,
       burnCalories: entry.burnCalories,
-      intensity: entry.exerciseIntensity,
     }]);
   }
   clearExerciseItemComposer();
   document.querySelector("#exercise-note").value = entry?.exerciseNote ?? "";
-  exerciseForm.querySelectorAll('input[name="habits"]').forEach((checkbox) => {
-    checkbox.checked = (entry?.habits || []).includes(checkbox.value);
-  });
   renderExerciseItems();
 }
 
