@@ -626,7 +626,7 @@ function loadProfile() {
 function loadExercisePresets() {
   try {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(exercisePresetStorageKey)));
-    if (!Array.isArray(stored) || !stored.length) return getDefaultExercisePresets();
+    if (!Array.isArray(stored)) return getDefaultExercisePresets();
     return stored.map(normalizeExercisePreset).filter((preset) => preset.name);
   } catch {
     return getDefaultExercisePresets();
@@ -753,7 +753,7 @@ function getDefaultFoodPresets() {
 function loadFoodPresets() {
   try {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(foodPresetStorageKey)));
-    return Array.isArray(stored) && stored.length
+    return Array.isArray(stored)
       ? stored.map(normalizeFoodPreset).filter((preset) => preset.name)
       : getDefaultFoodPresets();
   } catch {
@@ -1244,11 +1244,9 @@ async function syncFromCloud() {
       if (cloudSettings?.payload && new Date(cloudSettings.updated_at) >= new Date(settingsUpdatedAt)) {
         profile = cloudSettings.payload.profile || {};
         exercisePresets = Array.isArray(cloudSettings.payload.exercisePresets)
-          && cloudSettings.payload.exercisePresets.length
           ? cloudSettings.payload.exercisePresets.map(normalizeExercisePreset).filter((preset) => preset.name)
           : getDefaultExercisePresets();
         foodPresets = Array.isArray(cloudSettings.payload.foodPresets)
-          && cloudSettings.payload.foodPresets.length
           ? cloudSettings.payload.foodPresets.map(normalizeFoodPreset).filter((preset) => preset.name)
           : getDefaultFoodPresets();
         settingsUpdatedAt = cloudSettings.updated_at;
