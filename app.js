@@ -47,7 +47,6 @@ const cancelExercisePresetEditButton = document.querySelector("#cancel-exercise-
 const exercisePresetList = document.querySelector("#exercise-preset-list");
 const foodPresetList = document.querySelector("#food-preset-list");
 const saveFoodPresetButton = document.querySelector("#save-food-preset");
-const foodPresetNameInput = document.querySelector("#food-preset-name");
 const cancelFoodPresetEditButton = document.querySelector("#cancel-food-preset-edit");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
 const summaryCarouselTitle = document.querySelector("#summary-carousel-title");
@@ -89,12 +88,6 @@ const supabaseClient = hasSupabaseConfig() && window.supabase
   ? window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey)
   : null;
 const exerciseHabitValues = ["walk", "stretch", "strength"];
-const defaultFoodPresets = [
-  { meal: "breakfast", label: "朝の定番", calories: 420, habits: ["water", "protein"], note: "朝はたんぱく質を入れる。" },
-  { meal: "lunch", label: "昼の定番", calories: 650, habits: ["protein", "vegetables"], note: "昼は主食と野菜を揃える。" },
-  { meal: "dinner", label: "夜の定番", calories: 700, habits: ["vegetables", "slow_eating"], note: "夜はゆっくり食べて整える。" },
-  { meal: "snack", label: "間食控えめ", calories: 150, habits: ["no_snack"], note: "間食は軽めにする。" },
-];
 const defaultExercisePresets = [
   { id: "starter-walk", name: "ウォーキング", exerciseName: "ウォーキング", baseUnit: "minute", baseAmount: 10, caloriesPerBase: null },
   { id: "starter-stretch", name: "ストレッチ", exerciseName: "ストレッチ", baseUnit: "minute", baseAmount: 5, caloriesPerBase: null },
@@ -124,7 +117,6 @@ let settingsDirty = false;
 let editingExercisePresetId = null;
 let editingFoodPresetId = null;
 let selectedFoodMeal = "breakfast";
-let foodMealNotesDraft = createEmptyMealNotes();
 let foodMealItemsDraft = createEmptyMealItems();
 let exerciseItemsDraft = [];
 
@@ -182,7 +174,6 @@ exerciseForm.addEventListener("submit", (event) => {
   entry.exerciseMinutes = sumExerciseItems(entry.exerciseItems, "minutes");
   entry.exerciseName = entry.exerciseItems[0]?.name || "";
   entry.exerciseType = "";
-  entry.exerciseNote = String(formData.get("exerciseNote") || "").trim();
   entry.habits = [];
   commitEntry(entry);
   saveEntries();
@@ -206,9 +197,6 @@ foodForm.addEventListener("submit", (event) => {
   entry.meals = getMealsFromCalories(entry.mealCalories);
   entry.meal = deriveMealScore(entry.meals, []);
   entry.habits = entry.habits.filter((habit) => !exerciseHabitValues.includes(habit));
-  saveCurrentMealNote();
-  entry.mealNotes = { ...foodMealNotesDraft };
-  entry.note = "";
   commitEntry(entry);
   saveEntries();
   render();
@@ -554,11 +542,9 @@ onboardingForm.addEventListener("submit", (event) => {
       burnCalories: null,
       exerciseMinutes: null,
       exerciseType: "",
-      exerciseNote: "",
       meal: 3,
       meals: [],
       habits: ["water"],
-      note: profile.note,
       updatedAt: new Date().toISOString(),
     });
     saveEntries();
@@ -678,13 +664,10 @@ function getOrCreateEntry(date) {
     exerciseMinutes: previous?.exerciseMinutes ?? null,
     exerciseType: previous?.exerciseType ?? "",
     exerciseName: previous?.exerciseName ?? "",
-    exerciseNote: previous?.exerciseNote ?? "",
     exerciseItems: normalizeExerciseItems(previous?.exerciseItems),
     meal: previous?.meal ?? 2,
     meals: previous?.meals ?? [],
     habits: previous?.habits ?? [],
-    mealNotes: normalizeMealNotes(previous?.mealNotes, previous?.note, previous?.meals),
-    note: previous?.note ?? "",
     updatedAt: new Date().toISOString(),
   };
 }
@@ -720,7 +703,6 @@ function normalizeExercisePreset(preset) {
     baseUnit,
     baseAmount,
     caloriesPerBase,
-    note: typeof preset.note === "string" ? preset.note : "",
   };
 }
 
@@ -742,19 +724,14 @@ function saveExercisePresets() {
 }
 
 function getDefaultFoodPresets() {
-  return defaultFoodPresets.map((preset) => normalizeFoodPreset({
-    name: preset.label,
-    mealCalories: { [preset.meal]: preset.calories },
-    meals: [preset.meal],
-    note: preset.note,
-  }));
+  return [];
 }
 
 function loadFoodPresets() {
   try {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(foodPresetStorageKey)));
     return Array.isArray(stored)
-      ? stored.map(normalizeFoodPreset).filter((preset) => preset.name)
+      ? normalizeFoodPresetList(stored)
       : getDefaultFoodPresets();
   } catch {
     return getDefaultFoodPresets();
@@ -762,15 +739,23 @@ function loadFoodPresets() {
 }
 
 function normalizeFoodPreset(preset) {
+  const legacyItems = normalizeMealItems(preset.mealItems);
+  const legacyItem = Object.values(legacyItems).flat()[0];
+  const legacyCalories = getMealCaloriesTotal(preset.mealCalories || {});
+  const foodName = String(preset.foodName || preset.name || preset.label || legacyItem?.name || "").trim().slice(0, 60);
   return {
     id: typeof preset.id === "string" ? preset.id : createId(),
-    name: String(preset.name || preset.label || "").trim().slice(0, 40),
-    mealCalories: preset.mealCalories && typeof preset.mealCalories === "object" ? preset.mealCalories : {},
-    mealItems: normalizeMealItems(preset.mealItems),
-    meals: Array.isArray(preset.meals) ? preset.meals : (preset.meal ? [preset.meal] : []),
-    mealNotes: normalizeMealNotes(preset.mealNotes, preset.note, preset.meals),
-    note: "",
+    name: foodName,
+    foodName,
+    calories: numberOrNull(preset.calories) ?? numberOrNull(legacyItem?.calories) ?? legacyCalories,
   };
+}
+
+function normalizeFoodPresetList(presets) {
+  const legacyStarters = new Set(["朝の定番:420", "昼の定番:650", "夜の定番:700", "間食控えめ:150"]);
+  return presets
+    .map(normalizeFoodPreset)
+    .filter((preset) => preset.name && !legacyStarters.has(`${preset.foodName}:${preset.calories}`));
 }
 
 function saveFoodPresets() {
@@ -1130,7 +1115,6 @@ function deleteEntryScope(scope, date) {
     entry.exerciseMinutes = null;
     entry.exerciseType = "";
     entry.exerciseName = "";
-    entry.exerciseNote = "";
     entry.exerciseItems = [];
     entry.habits = entry.habits.filter((habit) => !exerciseHabitValues.includes(habit));
   } else {
@@ -1139,8 +1123,6 @@ function deleteEntryScope(scope, date) {
     entry.mealItems = createEmptyMealItems();
     entry.meal = 2;
     entry.meals = [];
-    entry.mealNotes = createEmptyMealNotes();
-    entry.note = "";
   }
 
   if (isEntryEmpty(entry)) {
@@ -1232,7 +1214,7 @@ async function syncFromCloud() {
           exercisePresets = legacyData.exercisePresets.map(normalizeExercisePreset).filter((preset) => preset.name);
         }
         if (Array.isArray(legacyData.foodPresets)) {
-          foodPresets = legacyData.foodPresets.map(normalizeFoodPreset).filter((preset) => preset.name);
+          foodPresets = normalizeFoodPresetList(legacyData.foodPresets);
         }
         settingsUpdatedAt = new Date().toISOString();
       }
@@ -1247,7 +1229,7 @@ async function syncFromCloud() {
           ? cloudSettings.payload.exercisePresets.map(normalizeExercisePreset).filter((preset) => preset.name)
           : getDefaultExercisePresets();
         foodPresets = Array.isArray(cloudSettings.payload.foodPresets)
-          ? cloudSettings.payload.foodPresets.map(normalizeFoodPreset).filter((preset) => preset.name)
+          ? normalizeFoodPresetList(cloudSettings.payload.foodPresets)
           : getDefaultFoodPresets();
         settingsUpdatedAt = cloudSettings.updated_at;
       } else {
@@ -1997,7 +1979,6 @@ function applyExercisePreset(preset) {
   setExerciseBaseValue(preset.baseUnit, preset.baseAmount);
   document.querySelector("#exercise-base-calories").value = preset.caloriesPerBase ?? "";
   setExerciseMultiplierValue(1);
-  document.querySelector("#exercise-note").value = preset.note;
   updateExerciseCalculation();
 }
 
@@ -2015,7 +1996,6 @@ function saveCurrentExerciseAsPreset() {
     exerciseName: document.querySelector("#exercise-name")?.value || "",
     ...getSelectedExerciseBase(),
     caloriesPerBase: document.querySelector("#exercise-base-calories")?.value,
-    note: document.querySelector("#exercise-note")?.value.trim() || "",
   });
 
   if (!preset.exerciseName || preset.caloriesPerBase === null) {
@@ -2326,9 +2306,9 @@ function renderFoodPresets() {
     .map((preset) => `
       <article class="preset-card exercise-preset-card">
         <button class="preset-apply-button" type="button" data-food-preset="${escapeHtml(preset.id)}">
-          <span>${escapeHtml(preset.name)}</span>
-          <strong>${getMealLogLabel(preset.meals)}</strong>
-          <small>${getMealCaloriesTotal(preset.mealCalories) ?? 0}kcal</small>
+          <span>食事プリセット</span>
+          <strong>${escapeHtml(preset.foodName)}</strong>
+          <small>${preset.calories ?? 0}kcal</small>
         </button>
         <div class="preset-card-actions">
           <button type="button" data-edit-food-preset="${escapeHtml(preset.id)}" aria-label="${escapeHtml(preset.name)}を編集">編集</button>
@@ -2365,50 +2345,44 @@ function renderFoodPresets() {
 
 function applyFoodPreset(preset) {
   if (!preset) return;
-  const sourceMeals = preset.meals?.length ? preset.meals : ["breakfast"];
-  const targets = sourceMeals.length === 1
-    ? [{ source: sourceMeals[0], target: selectedFoodMeal }]
-    : sourceMeals.map((meal) => ({ source: meal, target: meal }));
-  const presetItems = normalizeMealItems(preset.mealItems);
-  const presetNotes = normalizeMealNotes(preset.mealNotes, preset.note, sourceMeals);
-  targets.forEach(({ source, target }) => {
-    foodMealItemsDraft[target] = presetItems[source].map((item) => ({ ...item, id: createId() }));
-    document.querySelector(`#${target}-calories`).value = preset.mealCalories[source] ?? "";
-    foodMealNotesDraft[target] = presetNotes[source] || "";
+  const currentCalories = numberOrNull(document.querySelector(`#${selectedFoodMeal}-calories`).value);
+  if (!foodMealItemsDraft[selectedFoodMeal].length && currentCalories !== null) {
+    foodMealItemsDraft[selectedFoodMeal].push({
+      id: createId(),
+      name: "その他（入力済み）",
+      amount: "",
+      calories: currentCalories,
+      protein: null,
+      fat: null,
+      carbs: null,
+    });
+  }
+  foodMealItemsDraft[selectedFoodMeal].push({
+    id: createId(),
+    name: preset.foodName,
+    amount: "",
+    calories: preset.calories,
+    protein: null,
+    fat: null,
+    carbs: null,
   });
-  selectMealInput(targets[0].target);
+  syncMealCaloriesFromItems(selectedFoodMeal);
   renderFoodItems();
-  updateIntakeCaloriesTotal();
   updateNutritionSummary();
 }
 
 function saveCurrentFoodAsPreset() {
-  const name = foodPresetNameInput.value.trim();
-  if (!name) {
-    setSaveFeedback("food", "error", "プリセット名を入力してください。");
-    foodPresetNameInput.focus();
+  const foodName = document.querySelector("#food-item-name").value.trim();
+  const calories = numberOrNull(document.querySelector("#food-item-calories").value);
+  if (!foodName || calories === null) {
+    setSaveFeedback("food", "error", "食事名とカロリーを入力してください。");
+    (!foodName ? document.querySelector("#food-item-name") : document.querySelector("#food-item-calories")).focus();
     return;
   }
-  const allMealCalories = getMealCaloriesWithItems(foodMealItemsDraft);
-  const selectedCalories = allMealCalories[selectedFoodMeal];
-  saveCurrentMealNote();
-  if (selectedCalories === null && !foodMealItemsDraft[selectedFoodMeal].length && !foodMealNotesDraft[selectedFoodMeal]) {
-    setSaveFeedback("food", "error", "選択中の食事内容を入力してからプリセットに追加してください。");
-    return;
-  }
-  const presetMealItems = createEmptyMealItems();
-  presetMealItems[selectedFoodMeal] = foodMealItemsDraft[selectedFoodMeal].map((item) => ({ ...item, id: createId() }));
-  const presetMealNotes = createEmptyMealNotes();
-  presetMealNotes[selectedFoodMeal] = foodMealNotesDraft[selectedFoodMeal];
   const preset = normalizeFoodPreset({
     id: editingFoodPresetId || createId(),
-    name,
-    mealCalories: { [selectedFoodMeal]: selectedCalories },
-    mealItems: presetMealItems,
-    meals: [selectedFoodMeal],
-    habits: [],
-    mealNotes: presetMealNotes,
-    note: "",
+    foodName,
+    calories,
   });
   if (editingFoodPresetId) {
     foodPresets = foodPresets.map((item) => item.id === editingFoodPresetId ? preset : item);
@@ -2427,18 +2401,18 @@ function saveCurrentFoodAsPreset() {
 function beginFoodPresetEdit(preset) {
   if (!preset) return;
   editingFoodPresetId = preset.id;
-  selectMealInput(preset.meals?.[0] || "breakfast");
-  applyFoodPreset(preset);
-  foodPresetNameInput.value = preset.name;
+  clearFoodItemComposer();
+  document.querySelector("#food-item-name").value = preset.foodName;
+  document.querySelector("#food-item-calories").value = preset.calories ?? "";
   saveFoodPresetButton.textContent = "プリセットを更新";
   cancelFoodPresetEditButton.hidden = false;
-  foodPresetNameInput.focus();
+  document.querySelector("#food-item-name").focus();
 }
 
 function cancelFoodPresetEdit() {
   editingFoodPresetId = null;
-  foodPresetNameInput.value = "";
-  saveFoodPresetButton.textContent = "選択中の食事をプリセットに追加";
+  clearFoodItemComposer();
+  saveFoodPresetButton.textContent = "食事名とカロリーをプリセットに保存";
   cancelFoodPresetEditButton.hidden = true;
 }
 
@@ -2595,7 +2569,6 @@ function renderFoodHistory() {
         </div>
         <div>${getMealLogLabel(entry.meals || [])} / ${getMealCaloriesLabel(entry)}</div>
         <div>${getMealItemsLabel(entry)}</div>
-        <div>${getMealNotesLabel(entry)}</div>
         <div class="history-actions">
           <button type="button" data-edit-entry="food" data-entry-date="${entry.date}">編集</button>
           <button type="button" data-delete-entry="food" data-entry-date="${entry.date}">削除</button>
@@ -2619,16 +2592,7 @@ function hasFoodEntry(entry) {
     ||
     numberOrNull(entry.intakeCalories) !== null
     || (entry.meals || []).length
-    || Object.values(normalizeMealNotes(entry.mealNotes, entry.note, entry.meals)).some(Boolean)
   ));
-}
-
-function getMealNotesLabel(entry) {
-  const notes = normalizeMealNotes(entry.mealNotes, entry.note, entry.meals);
-  const labels = Object.entries(notes)
-    .filter(([, note]) => note)
-    .map(([meal, note]) => `${getMealName(meal)}: ${escapeHtml(note)}`);
-  return labels.length ? labels.join(" / ") : "メモなし";
 }
 
 function getMealCaloriesFromInputs() {
@@ -2645,43 +2609,17 @@ function selectMealInput(meal) {
   if (input) input.checked = true;
   selectedFoodMeal = meal;
   showSelectedMealInput(meal);
-  document.querySelector("#food-note-label").textContent = `${getMealName(meal)}のメモ`;
-  document.querySelector("#note").value = foodMealNotesDraft[meal] || "";
   renderFoodItems();
 }
 
 function changeSelectedMeal(meal) {
-  saveCurrentMealNote();
   selectMealInput(meal);
-}
-
-function saveCurrentMealNote() {
-  const noteInput = document.querySelector("#note");
-  if (!noteInput) return;
-  foodMealNotesDraft[selectedFoodMeal] = noteInput.value.trim();
 }
 
 function showSelectedMealInput(meal) {
   foodForm.querySelectorAll("[data-meal-input-card]").forEach((card) => {
     card.hidden = card.dataset.mealInputCard !== meal;
   });
-}
-
-function createEmptyMealNotes() {
-  return { breakfast: "", lunch: "", dinner: "", snack: "" };
-}
-
-function normalizeMealNotes(mealNotes, legacyNote = "", meals = []) {
-  const normalized = createEmptyMealNotes();
-  if (mealNotes && typeof mealNotes === "object") {
-    Object.keys(normalized).forEach((meal) => {
-      normalized[meal] = typeof mealNotes[meal] === "string" ? mealNotes[meal] : "";
-    });
-  }
-  if (!Object.values(normalized).some(Boolean) && legacyNote) {
-    normalized[meals?.[0] || "breakfast"] = String(legacyNote);
-  }
-  return normalized;
 }
 
 function getMealCaloriesTotal(mealCalories = {}) {
@@ -2880,7 +2818,6 @@ function fillExerciseFormForDate(date) {
     }]);
   }
   clearExerciseItemComposer();
-  document.querySelector("#exercise-note").value = entry?.exerciseNote ?? "";
   renderExerciseItems();
 }
 
@@ -2895,7 +2832,6 @@ function fillFoodFormForDate(date) {
   document.querySelector("#snack-calories").value = mealCalories.snack ?? "";
   document.querySelector("#intake-calories").value = entry?.intakeCalories ?? "";
   foodMealItemsDraft = normalizeMealItems(entry?.mealItems);
-  foodMealNotesDraft = normalizeMealNotes(entry?.mealNotes, entry?.note, entry?.meals);
   selectMealInput(getMealsFromCalories(mealCalories)[0] || selectedFoodMeal || "breakfast");
   renderFoodItems();
   updateNutritionSummary();

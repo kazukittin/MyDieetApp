@@ -1344,6 +1344,20 @@ h2 {
   grid-column: span 2;
 }
 
+.food-item-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.food-item-actions button {
+  width: 100%;
+}
+
+.food-item-actions #cancel-food-preset-edit {
+  grid-column: 1 / -1;
+}
+
 .nutrition-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2350,6 +2364,7 @@ legend {
   }
 
   .food-item-input-grid,
+  .food-item-actions,
   .nutrition-summary {
     grid-template-columns: 1fr;
   }
