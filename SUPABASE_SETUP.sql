@@ -65,8 +65,41 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  target_user_id uuid := (select auth.uid());
+  legacy_rows_remain boolean := false;
 begin
-  delete from auth.users where id = (select auth.uid());
+  if target_user_id is null then
+    raise exception 'Authentication is required to delete an account';
+  end if;
+
+  -- Explicitly remove every row owned by the user. The function runs as one
+  -- transaction, so any error or failed verification rolls everything back.
+  delete from public.diet_entries where user_id = target_user_id;
+  delete from public.diet_user_settings where user_id = target_user_id;
+
+  -- Remove data from the legacy migration table when it still exists.
+  if to_regclass('public.diet_user_data') is not null then
+    execute 'delete from public.diet_user_data where user_id = $1'
+      using target_user_id;
+    execute 'select exists (select 1 from public.diet_user_data where user_id = $1)'
+      into legacy_rows_remain
+      using target_user_id;
+  end if;
+
+  if exists (select 1 from public.diet_entries where user_id = target_user_id)
+    or exists (select 1 from public.diet_user_settings where user_id = target_user_id)
+    or legacy_rows_remain then
+    raise exception 'User data remains; account deletion was rolled back';
+  end if;
+
+  -- Deleting auth.users also removes Auth-owned dependent rows. Any unknown
+  -- foreign-key dependency blocks this delete and rolls back the transaction.
+  delete from auth.users where id = target_user_id;
+
+  if exists (select 1 from auth.users where id = target_user_id) then
+    raise exception 'Auth user remains; account deletion was rolled back';
+  end if;
 end;
 $$;
 

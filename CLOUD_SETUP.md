@@ -8,6 +8,10 @@ SupabaseのSQL Editorで `SUPABASE_SETUP.sql` を実行します。以前の版�
 
 新しい同期では `diet_entries` と `diet_user_settings` を使います。旧 `diet_user_data` は初回同期時の移行元として読み取るため、全利用者の移行が終わるまでは残してください。
 
+アカウント削除は、現行2テーブルと旧 `diet_user_data` の対象行を明示削除し、残存がないことを確認してから `auth.users` を削除します。処理は1トランザクションなので、途中で失敗した場合は全削除をロールバックします。`SUPABASE_SETUP.sql` を再実行し、最新の `delete_my_account()` を反映してください。
+
+Supabase Storageを将来使う場合は、Authユーザーを削除する前にStorage APIで本人所有のファイルを削除してください。StorageファイルをSQLだけで削除してはいけません。
+
 ## 2. メール認証を設定
 
 Supabase DashboardのAuthenticationでEmail認証を有効にします。
