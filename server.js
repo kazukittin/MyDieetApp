@@ -12,6 +12,8 @@ const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".svg": "image/svg+xml",
 };
 
 const server = http.createServer((request, response) => {
@@ -29,9 +31,10 @@ server.listen(port, host, () => {
 
 function serveStatic(pathname, response) {
   const safePath = pathname === "/" ? "/index.html" : pathname;
-  const filePath = path.normalize(path.join(root, safePath));
+  const filePath = path.resolve(root, `.${safePath}`);
+  const relativePath = path.relative(root, filePath);
 
-  if (!filePath.startsWith(root)) {
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     response.writeHead(403);
     response.end("Forbidden");
     return;
@@ -47,6 +50,8 @@ function serveStatic(pathname, response) {
     response.writeHead(200, {
       "Content-Type": contentTypes[path.extname(filePath)] || "application/octet-stream",
       "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
     });
     response.end(data);
   });

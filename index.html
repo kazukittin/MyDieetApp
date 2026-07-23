@@ -3,7 +3,11 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#2f855a">
+    <meta name="description" content="体重・食事・運動を無理なく続けるダイエット記録アプリ">
     <title>My Diet Notebook</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -89,6 +93,7 @@
 
         <div class="settings-tabs" role="tablist" aria-label="設定カテゴリー">
           <button class="is-active" type="button" role="tab" data-settings-tab="profile">プロフィール</button>
+          <button type="button" role="tab" data-settings-tab="app">アプリ</button>
           <button type="button" role="tab" data-settings-tab="account">アカウント</button>
         </div>
 
@@ -134,6 +139,18 @@
             </form>
           </section>
 
+          <section class="settings-section" data-settings-panel="app" hidden>
+            <div class="settings-section-heading">
+              <div><h3>アプリとデータ</h3><p>通知、インストール、バックアップを管理します。</p></div>
+            </div>
+            <div class="settings-form">
+              <div class="setting-action-card"><div><strong>ホーム画面に追加</strong><p>アプリのように素早く起動できます。</p></div><button id="install-app" class="ghost-button" type="button" hidden>インストール</button></div>
+              <div class="setting-action-card"><div><strong>記録リマインダー</strong><p>指定時刻に、この端末で記録を促します。</p></div><label><span>時刻</span><input id="reminder-time" type="time" value="21:00"></label><button id="enable-reminder" class="ghost-button" type="button">通知を有効にする</button></div>
+              <div class="setting-action-card"><div><strong>バックアップ</strong><p>プロフィール、記録、プリセットをJSONで保存・復元します。</p></div><div class="account-secondary-actions"><button id="export-backup" class="ghost-button" type="button">書き出す</button><button id="import-backup" class="ghost-button" type="button">復元する</button><input id="import-backup-file" type="file" accept="application/json,.json" hidden></div></div>
+              <p id="app-settings-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
+            </div>
+          </section>
+
           <section class="settings-section" data-settings-panel="account" hidden>
             <div class="settings-section-heading">
               <div>
@@ -172,6 +189,7 @@
                 <button id="sync-now" class="text-button" type="button">今すぐ同期</button>
                 <button id="logout-button" class="ghost-button" type="button">ログアウト</button>
               </div>
+              <p class="sync-detail">同期状態: <strong id="sync-status">ログイン待ち</strong>・未送信 <strong id="pending-sync-count">0件</strong></p>
 
               <details class="account-disclosure danger-disclosure">
                 <summary>危険な操作</summary>
@@ -198,17 +216,27 @@
         </div>
       </nav>
 
-      <section class="unified-section summary-carousel-section" aria-labelledby="summary-carousel-title">
-        <div class="carousel-heading">
-          <button id="summary-prev" type="button" aria-label="前のカードへ">←</button>
+      <section class="today-first-section" aria-labelledby="today-first-title">
+        <div class="section-title-row">
           <div>
-            <p class="section-kicker">Summary</p>
-            <h2 id="summary-carousel-title">概要</h2>
-            <span id="summary-carousel-position">1 / 4</span>
+            <p class="section-kicker">Today</p>
+            <h1 id="today-first-title">今日の記録</h1>
+            <p>全部埋めなくても大丈夫。まず1つだけ記録しましょう。</p>
           </div>
-          <button id="summary-next" type="button" aria-label="次のカードへ">→</button>
+          <span id="today-completion-badge" class="today-completion-badge">0 / 3</span>
+        </div>
+        <div id="today-checklist-mount"></div>
+      </section>
+
+      <section class="unified-section summary-overview-section" aria-labelledby="summary-title">
+        <div class="section-title-row compact">
+          <div><p class="section-kicker">Summary</p><h2 id="summary-title">現在の状態</h2></div>
         </div>
         <div id="summary-carousel-mount"></div>
+        <details class="more-metrics">
+          <summary>詳しい指標を見る</summary>
+          <div id="detail-metrics-mount"></div>
+        </details>
       </section>
 
       <div id="unified-support" class="unified-support"></div>
@@ -231,19 +259,16 @@
           <fieldset>
             <legend>期間</legend>
             <div class="filter-buttons">
-              <button type="button" data-unified-range="7">1週間</button>
-              <button type="button" data-unified-range="31" class="is-active">1か月</button>
+              <button type="button" data-unified-range="7" class="is-active">1週間</button>
+              <button type="button" data-unified-range="31">1か月</button>
               <button type="button" data-unified-range="92">3か月</button>
-              <button type="button" data-unified-range="183">6か月</button>
-              <button type="button" data-unified-range="365">1年</button>
-              <button type="button" data-unified-range="730">2年</button>
             </div>
           </fieldset>
           <fieldset id="balance-filter-group">
             <legend>表示項目</legend>
             <div class="filter-checks">
               <label><input type="checkbox" data-balance-series="intake" checked>摂取</label>
-              <label><input type="checkbox" data-balance-series="burn" checked>消費</label>
+              <label><input type="checkbox" data-balance-series="burn" checked>運動消費</label>
               <label><input type="checkbox" data-balance-series="weight" checked>体重</label>
             </div>
           </fieldset>
@@ -257,18 +282,16 @@
             </div>
           </fieldset>
         </div>
+        <details class="chart-advanced">
+          <summary>表示項目の詳細設定</summary>
+          <div id="chart-advanced-content"></div>
+        </details>
         <div id="unified-chart-mount"></div>
       </section>
 
-      <section class="unified-section history-carousel-section" aria-labelledby="history-carousel-title">
-        <div class="carousel-heading">
-          <button id="history-prev" type="button" aria-label="前の履歴へ">←</button>
-          <div>
-            <p class="section-kicker">History</p>
-            <h2 id="history-carousel-title">すべての履歴</h2>
-            <span id="history-carousel-position">1 / 4</span>
-          </div>
-          <button id="history-next" type="button" aria-label="次の履歴へ">→</button>
+      <section class="unified-section history-list-section" aria-labelledby="history-title">
+        <div class="section-title-row compact">
+          <div><p class="section-kicker">History</p><h2 id="history-title">記録タイムライン</h2></div>
         </div>
         <div id="history-carousel-mount"></div>
       </section>
@@ -290,7 +313,7 @@
               <article class="metric">
                 <span>記録スコア</span>
                 <strong id="weekly-score">--</strong>
-                <small id="weekly-score-detail">体重・食事・運動・睡眠</small>
+                <small id="weekly-score-detail">体重・食事・運動</small>
               </article>
               <article class="metric pfc-metric">
                 <span>PFCバランス</span>
@@ -314,13 +337,13 @@
               <div class="panel-heading">
                 <div>
                   <p class="section-kicker">Calories</p>
-                  <h2 id="calorie-heading">カロリーバランス</h2>
+                  <h2 id="calorie-heading">摂取と運動消費</h2>
                 </div>
                 <span id="calorie-balance-label" class="calorie-balance-label">記録すると表示されます</span>
               </div>
               <div class="calorie-summary">
                 <div><span>摂取</span><strong id="intake-calorie-label">-- kcal</strong></div>
-                <div><span>消費</span><strong id="burn-calorie-label">-- kcal</strong></div>
+                <div><span>運動消費</span><strong id="burn-calorie-label">-- kcal</strong></div>
                 <div><span>体重</span><strong id="combo-weight-label">-- kg</strong></div>
               </div>
               <div class="range-tabs" aria-label="グラフ表示期間">
@@ -331,17 +354,17 @@
                 <button type="button" data-range-days="31" class="is-active">1か月</button>
                 <button type="button" data-range-days="7">1週間</button>
               </div>
-              <div class="chart-legend calorie-chart-legend" aria-label="カロリーバランスグラフの説明">
+              <div class="chart-legend calorie-chart-legend" aria-label="摂取と運動消費グラフの説明">
                 <span class="legend-item"><i class="legend-intake"></i>摂取カロリー</span>
-                <span class="legend-item"><i class="legend-burn"></i>消費カロリー</span>
+                <span class="legend-item"><i class="legend-burn"></i>運動消費（推定）</span>
                 <span class="legend-item"><i class="legend-weight"></i>体重</span>
               </div>
               <div class="calorie-chart-wrap">
                 <svg id="calorie-combo-chart" class="calorie-combo-chart" viewBox="0 0 720 260" role="img" aria-labelledby="calorie-chart-title">
-                  <title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>
+                  <title id="calorie-chart-title">摂取カロリーは線グラフ、運動消費の推定値は棒グラフ、体重は線グラフ</title>
                 </svg>
               </div>
-              <p id="calorie-chart-empty" class="empty">摂取カロリー、消費カロリー、体重のどれかを記録するとグラフが表示されます。</p>
+              <p id="calorie-chart-empty" class="empty">摂取カロリー、運動消費、体重のどれかを記録するとグラフが表示されます。運動消費は目安で、基礎代謝を含みません。</p>
             </section>
 
             <aside class="dashboard-side" aria-label="ダッシュボード補助情報">
@@ -362,6 +385,7 @@
                     <div id="habit-progress" class="progress-fill"></div>
                   </div>
                 </div>
+                <div id="action-insights" class="action-insights" aria-live="polite"></div>
               </section>
 
               <section class="panel daily-status-panel">
@@ -372,9 +396,9 @@
                   </div>
                 </div>
                 <div class="daily-status-list">
-                  <span id="weight-status-pill" class="status-pill">体重 未入力</span>
-                  <span id="food-status-pill" class="status-pill">食事 未入力</span>
-                  <span id="exercise-status-pill" class="status-pill">運動 未入力</span>
+                  <button id="weight-status-pill" class="status-pill" type="button" data-quick-record="weight">体重 未入力</button>
+                  <button id="food-status-pill" class="status-pill" type="button" data-quick-record="food">食事 未入力</button>
+                  <button id="exercise-status-pill" class="status-pill" type="button" data-quick-record="exercise">運動 未入力</button>
                 </div>
               </section>
 
@@ -465,7 +489,7 @@
             <article class="metric">
               <span>今週の消費</span>
               <strong id="exercise-week-burn">-- kcal</strong>
-              <small id="exercise-week-burn-detail">消費カロリーから計算</small>
+              <small id="exercise-week-burn-detail">運動消費の推定値</small>
             </article>
             <article class="metric">
               <span>運動した日</span>
@@ -521,6 +545,8 @@
                 </div>
                 <div id="exercise-item-list" class="entry-item-list"></div>
               </section>
+              <details class="builder-details">
+                <summary>運動プリセットを作成・編集</summary>
               <section class="preset-save-row exercise-preset-builder" aria-labelledby="exercise-preset-builder-title">
                 <div class="preset-builder-heading">
                   <span>Preset builder</span>
@@ -541,7 +567,7 @@
                   </select>
                 </label>
                 <label>
-                  <span>基準消費 kcal</span>
+                  <span>基準運動消費 kcal（推定）</span>
                   <input id="exercise-preset-calories" type="number" min="0" max="5000" step="1" placeholder="50">
                 </label>
                 <div class="preset-edit-actions">
@@ -549,6 +575,7 @@
                   <button id="cancel-exercise-preset-edit" class="text-button" type="button" hidden>編集をキャンセル</button>
                 </div>
               </section>
+              </details>
               <button class="primary-button" type="submit" data-save-scope="exercise">運動を保存</button>
               <p id="exercise-save-feedback" class="save-feedback" role="status" aria-live="polite">今日できた運動を選んで保存できます。</p>
             </form>
@@ -610,6 +637,11 @@
                 </label>
               </div>
               <p class="preset-help">カードを押すと選択中の朝・昼・夜・間食へすぐ入力できます。</p>
+              <div class="food-shortcuts">
+                <button id="copy-previous-meal" class="ghost-button" type="button">前日の食事をコピー</button>
+                <span id="copy-previous-meal-help">前日に記録があると使えます。</span>
+              </div>
+              <div id="recent-food-list" class="recent-food-list" aria-label="最近使った食品"></div>
               <div id="food-preset-list" class="food-preset-list" aria-label="食事プリセット"></div>
 
               <fieldset class="control-group meal-selector-group">
@@ -643,24 +675,25 @@
                     <span>kcal</span>
                     <input id="food-item-calories" type="number" min="0" max="3000" step="1" placeholder="250">
                   </label>
-                  <label>
-                    <span>たんぱく質 g</span>
-                    <input id="food-item-protein" type="number" min="0" max="500" step="0.1" placeholder="0">
-                  </label>
-                  <label>
-                    <span>脂質 g</span>
-                    <input id="food-item-fat" type="number" min="0" max="500" step="0.1" placeholder="0">
-                  </label>
-                  <label>
-                    <span>炭水化物 g</span>
-                    <input id="food-item-carbs" type="number" min="0" max="1000" step="0.1" placeholder="0">
-                  </label>
                 </div>
+                <details class="nutrition-details">
+                  <summary>栄養素も入力する</summary>
+                  <div class="nutrition-input-grid">
+                    <label><span>たんぱく質 g</span><input id="food-item-protein" type="number" min="0" max="500" step="0.1" placeholder="0"></label>
+                    <label><span>脂質 g</span><input id="food-item-fat" type="number" min="0" max="500" step="0.1" placeholder="0"></label>
+                    <label><span>炭水化物 g</span><input id="food-item-carbs" type="number" min="0" max="1000" step="0.1" placeholder="0"></label>
+                  </div>
+                </details>
                 <div class="food-item-actions">
                   <button id="add-food-item" class="ghost-button" type="button">選択中の食事に追加</button>
-                  <button id="save-food-preset" class="ghost-button" type="button">食事名とカロリーをプリセットに保存</button>
-                  <button id="cancel-food-preset-edit" class="text-button" type="button" hidden>編集をキャンセル</button>
                 </div>
+                <details class="builder-details">
+                  <summary>この食品をプリセットに保存</summary>
+                  <div class="food-item-actions">
+                    <button id="save-food-preset" class="ghost-button" type="button">食事名とカロリーを保存</button>
+                    <button id="cancel-food-preset-edit" class="text-button" type="button" hidden>編集をキャンセル</button>
+                  </div>
+                </details>
                 <div id="food-item-list" class="entry-item-list"></div>
               </section>
 
@@ -763,7 +796,7 @@
           </button>
           <button type="button" data-record-choice="exercise">
             <strong>運動</strong>
-            <span>時間・消費・運動内容</span>
+            <span>時間・運動消費・運動内容</span>
           </button>
           <button type="button" data-record-choice="food">
             <strong>食事</strong>
@@ -772,6 +805,14 @@
         </div>
       </section>
     </div>
+
+    <nav class="mobile-bottom-nav" aria-label="クイック操作">
+      <button type="button" data-scroll-target="top">今日</button>
+      <button type="button" data-quick-record="food">食事</button>
+      <button class="mobile-record-main" type="button" data-open-record-menu aria-label="新しい記録">＋</button>
+      <button type="button" data-scroll-target="unified-chart-mount">推移</button>
+      <button type="button" data-open-settings-shortcut>設定</button>
+    </nav>
 
     <script src="config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

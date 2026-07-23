@@ -46,14 +46,15 @@ const exercisePresetNameInput = document.querySelector("#exercise-preset-name");
 const cancelExercisePresetEditButton = document.querySelector("#cancel-exercise-preset-edit");
 const exercisePresetList = document.querySelector("#exercise-preset-list");
 const foodPresetList = document.querySelector("#food-preset-list");
+const copyPreviousMealButton = document.querySelector("#copy-previous-meal");
+const recentFoodList = document.querySelector("#recent-food-list");
+const pendingSyncCount = document.querySelector("#pending-sync-count");
+const appSettingsFeedback = document.querySelector("#app-settings-feedback");
+const importBackupFile = document.querySelector("#import-backup-file");
 const saveFoodPresetButton = document.querySelector("#save-food-preset");
 const cancelFoodPresetEditButton = document.querySelector("#cancel-food-preset-edit");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
-const summaryCarouselTitle = document.querySelector("#summary-carousel-title");
-const summaryCarouselPosition = document.querySelector("#summary-carousel-position");
 const summaryCarouselMount = document.querySelector("#summary-carousel-mount");
-const historyCarouselTitle = document.querySelector("#history-carousel-title");
-const historyCarouselPosition = document.querySelector("#history-carousel-position");
 const historyCarouselMount = document.querySelector("#history-carousel-mount");
 const unifiedChartMount = document.querySelector("#unified-chart-mount");
 const balanceFilterGroup = document.querySelector("#balance-filter-group");
@@ -96,9 +97,7 @@ let profile = {};
 let exercisePresets = getDefaultExercisePresets();
 let foodPresets = getDefaultFoodPresets();
 let settingsUpdatedAt = new Date(0).toISOString();
-let comboChartRangeDays = 31;
-let summaryCarouselIndex = 0;
-let historyCarouselIndex = 0;
+let comboChartRangeDays = 7;
 let chartView = "balance";
 const balanceSeries = new Set(["intake", "burn", "weight"]);
 const weightSeries = new Set(["morning", "night", "average", "goal"]);
@@ -112,6 +111,7 @@ let editingFoodPresetId = null;
 let selectedFoodMeal = "breakfast";
 let foodMealItemsDraft = createEmptyMealItems();
 let exerciseItemsDraft = [];
+let deferredInstallPrompt = null;
 
 [weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
   input.value = isoToday;
@@ -126,9 +126,21 @@ if (document.querySelector("#today-label")) {
 }
 if (syncStatus) syncStatus.textContent = "ログイン待ち";
 initializeAuth();
+registerServiceWorker();
+restoreReminderSettings();
 
 window.addEventListener("focus", () => {
   if (activeUser) syncFromCloud();
+});
+window.addEventListener("online", () => {
+  setSyncState("再接続・同期中");
+  if (activeUser) syncFromCloud().catch(() => {});
+});
+window.addEventListener("offline", () => setSyncState("オフライン保存中"));
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  document.querySelector("#install-app").hidden = false;
 });
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && activeUser) syncFromCloud();
@@ -200,7 +212,22 @@ exerciseDateInput.addEventListener("change", () => {
 });
 foodDateInput.addEventListener("change", () => {
   fillFoodFormForDate(foodDateInput.value);
+  renderFoodShortcuts();
 });
+
+copyPreviousMealButton.addEventListener("click", copyPreviousDayFood);
+document.querySelectorAll("[data-quick-record]").forEach((button) => button.addEventListener("click", () => openQuickRecord(button.dataset.quickRecord)));
+document.querySelectorAll("[data-scroll-target]").forEach((button) => button.addEventListener("click", () => {
+  const target = button.dataset.scrollTarget === "top" ? document.body : document.querySelector(`#${button.dataset.scrollTarget}`);
+  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+}));
+document.querySelector("[data-open-settings-shortcut]").addEventListener("click", openSettings);
+document.querySelector("#export-backup").addEventListener("click", exportFullBackup);
+document.querySelector("#import-backup").addEventListener("click", () => importBackupFile.click());
+importBackupFile.addEventListener("change", importFullBackup);
+document.querySelector("#install-app").addEventListener("click", installApp);
+document.querySelector("#enable-reminder").addEventListener("click", enableReminder);
+document.querySelector("#reminder-time").addEventListener("change", saveReminderSettings);
 
 clearTodayButton.addEventListener("click", () => {
   const date = isoToday;
@@ -414,10 +441,6 @@ document.addEventListener("click", (event) => {
 undoDeleteButton.addEventListener("click", undoLastDeletion);
 
 openSettingsButton.addEventListener("click", openSettings);
-document.querySelector("#summary-prev").addEventListener("click", () => moveSummaryCarousel(-1));
-document.querySelector("#summary-next").addEventListener("click", () => moveSummaryCarousel(1));
-document.querySelector("#history-prev").addEventListener("click", () => moveHistoryCarousel(-1));
-document.querySelector("#history-next").addEventListener("click", () => moveHistoryCarousel(1));
 document.querySelectorAll("[data-chart-view]").forEach((button) => {
   button.addEventListener("click", () => {
     chartView = button.dataset.chartView;
@@ -524,7 +547,6 @@ onboardingForm.addEventListener("submit", (event) => {
       weight: setupWeight,
       weightMorning: setupWeight,
       weightNight: null,
-      sleep: null,
       intakeCalories: null,
       mealCalories: {},
       burnCalories: null,
@@ -644,7 +666,6 @@ function getOrCreateEntry(date) {
     weight: previous?.weight ?? null,
     weightMorning: previous?.weightMorning ?? null,
     weightNight: previous?.weightNight ?? null,
-    sleep: previous?.sleep ?? null,
     intakeCalories: previous?.intakeCalories ?? null,
     mealCalories: previous?.mealCalories ?? {},
     mealItems: normalizeMealItems(previous?.mealItems),
@@ -789,7 +810,7 @@ function normalizeEntryWeights(entry) {
   const weightMorning = numberOrNull(entry.weightMorning);
   const weightNight = numberOrNull(entry.weightNight);
   const weight = numberOrNull(entry.weight);
-  return {
+  const normalized = {
     ...entry,
     mealItems: normalizeMealItems(entry.mealItems),
     exerciseItems: normalizeExerciseItems(entry.exerciseItems),
@@ -797,6 +818,8 @@ function normalizeEntryWeights(entry) {
     weightNight,
     weight: weightNight ?? weightMorning ?? weight,
   };
+  delete normalized.sleep;
+  return normalized;
 }
 
 function getPrimaryWeight(entry) {
@@ -858,26 +881,25 @@ function switchSettingsTab(tabName) {
 
 function setupUnifiedScreen() {
   document.body.append(weightModal);
-  const summarySources = [
-    { label: "概要", element: document.querySelector(".summary-grid") },
-    { label: "体重", element: document.querySelector(".weight-summary-grid") },
-    { label: "運動", element: document.querySelector(".exercise-summary-grid") },
-    { label: "食事", element: document.querySelector(".food-summary-grid") },
-  ];
-  summarySources.forEach(({ label, element }, index) => {
-    const slide = document.createElement("div");
-    slide.className = "carousel-slide summary-carousel-slide";
-    slide.dataset.carouselLabel = label;
-    slide.hidden = index !== 0;
-    slide.append(element);
-    summaryCarouselMount.append(slide);
+  summaryCarouselMount.append(document.querySelector(".summary-grid"));
+  const detailMetricsMount = document.querySelector("#detail-metrics-mount");
+  [
+    ["体重", document.querySelector(".weight-summary-grid")],
+    ["運動", document.querySelector(".exercise-summary-grid")],
+    ["食事", document.querySelector(".food-summary-grid")],
+  ].forEach(([label, element]) => {
+    const section = document.createElement("section");
+    section.className = "detail-metric-group";
+    section.innerHTML = `<h3>${label}</h3>`;
+    section.append(element);
+    detailMetricsMount.append(section);
   });
 
   const support = document.querySelector("#unified-support");
   const insights = document.querySelector(".insights");
   const dailyStatus = document.querySelector(".daily-status-panel");
   if (insights) support.append(insights);
-  if (dailyStatus) support.append(dailyStatus);
+  if (dailyStatus) document.querySelector("#today-checklist-mount").append(dailyStatus);
   const streak = document.createElement("div");
   streak.className = "streak-badge";
   streak.innerHTML = '<span>連続記録</span><strong id="record-streak">0日</strong>';
@@ -891,6 +913,7 @@ function setupUnifiedScreen() {
   weightChartPanel.dataset.chartPanel = "weight";
   weightChartPanel.hidden = true;
   unifiedChartMount.append(caloriePanel, weightChartPanel);
+  document.querySelector("#chart-advanced-content").append(balanceFilterGroup, weightFilterGroup);
 
   const allHistory = document.querySelector(".history-panel");
   const exerciseHistory = document.querySelector(".exercise-history-panel");
@@ -903,52 +926,15 @@ function setupUnifiedScreen() {
     </div>
     <div id="weight-only-history-list" class="history-list"></div>
   `;
-  [
-    { label: "すべての履歴", element: allHistory },
-    { label: "体重履歴", element: weightHistory },
-    { label: "運動履歴", element: exerciseHistory },
-    { label: "食事履歴", element: foodHistory },
-  ].forEach(({ label, element }, index) => {
-    const slide = document.createElement("div");
-    slide.className = "carousel-slide history-carousel-slide";
-    slide.dataset.carouselLabel = label;
-    slide.hidden = index !== 0;
-    slide.append(element);
-    historyCarouselMount.append(slide);
-  });
+  historyCarouselMount.append(allHistory);
+  const categoryHistory = document.createElement("details");
+  categoryHistory.className = "category-history";
+  categoryHistory.innerHTML = "<summary>項目別の履歴を見る</summary>";
+  categoryHistory.append(weightHistory, exerciseHistory, foodHistory);
+  historyCarouselMount.append(categoryHistory);
 
   document.querySelector("#app-content").remove();
-  updateSummaryCarousel();
-  updateHistoryCarousel();
   updateChartView();
-}
-
-function moveSummaryCarousel(direction) {
-  summaryCarouselIndex = (summaryCarouselIndex + direction + 4) % 4;
-  updateSummaryCarousel();
-}
-
-function updateSummaryCarousel() {
-  const slides = Array.from(summaryCarouselMount.querySelectorAll(".carousel-slide"));
-  slides.forEach((slide, index) => {
-    slide.hidden = index !== summaryCarouselIndex;
-  });
-  summaryCarouselTitle.textContent = slides[summaryCarouselIndex]?.dataset.carouselLabel || "概要";
-  summaryCarouselPosition.textContent = `${summaryCarouselIndex + 1} / ${slides.length}`;
-}
-
-function moveHistoryCarousel(direction) {
-  historyCarouselIndex = (historyCarouselIndex + direction + 4) % 4;
-  updateHistoryCarousel();
-}
-
-function updateHistoryCarousel() {
-  const slides = Array.from(historyCarouselMount.querySelectorAll(".carousel-slide"));
-  slides.forEach((slide, index) => {
-    slide.hidden = index !== historyCarouselIndex;
-  });
-  historyCarouselTitle.textContent = slides[historyCarouselIndex]?.dataset.carouselLabel || "すべての履歴";
-  historyCarouselPosition.textContent = `${historyCarouselIndex + 1} / ${slides.length}`;
 }
 
 function updateChartView() {
@@ -1095,8 +1081,8 @@ function editEntryScope(scope, date) {
 function deleteEntryScope(scope, date) {
   const previous = entries.find((entry) => entry.date === date);
   if (!previous) return;
-  const labels = { weight: "体重・睡眠", exercise: "運動", food: "食事" };
-  if (scope !== "exercise" && !window.confirm(`${formatDateLabel(date)}の${labels[scope]}記録を削除しますか？`)) return;
+  const labels = { weight: "体重", exercise: "運動", food: "食事" };
+  if (!window.confirm(`${formatDateLabel(date)}の${labels[scope]}記録だけを削除しますか？ほかの項目は残ります。`)) return;
 
   lastDeletion = { entry: structuredClone(previous), scope };
   const entry = { ...previous, habits: [...(previous.habits || [])], updatedAt: new Date().toISOString() };
@@ -1104,7 +1090,6 @@ function deleteEntryScope(scope, date) {
     entry.weight = null;
     entry.weightMorning = null;
     entry.weightNight = null;
-    entry.sleep = null;
   } else if (scope === "exercise") {
     entry.burnCalories = null;
     entry.exerciseMinutes = null;
@@ -1511,6 +1496,7 @@ function getResendErrorMessage(error) {
 
 function setSyncState(status, message) {
   if (syncStatus) syncStatus.textContent = status;
+  if (pendingSyncCount) pendingSyncCount.textContent = `${dirtyEntryDates.size + (settingsDirty ? 1 : 0)}件`;
   if (message && cloudFeedback) setCloudFeedback("error", message);
 }
 
@@ -1568,6 +1554,9 @@ function render() {
   renderWeightChart();
   renderHistory();
   renderWeightOnlyHistory();
+  renderFoodShortcuts();
+  renderActionInsights();
+  setSyncState(!activeUser ? "ログイン待ち" : (navigator.onLine ? (dirtyEntryDates.size || settingsDirty ? "同期待ち" : "同期済み") : "オフライン保存中"));
 }
 
 function renderSummary() {
@@ -1606,15 +1595,23 @@ function renderWeeklyReport(weekEntries) {
 }
 
 function renderDailyStatus(entry) {
-  setStatusPill("#weight-status-pill", "体重", hasWeightEntry(entry));
-  setStatusPill("#food-status-pill", "食事", numberOrNull(entry?.intakeCalories) !== null);
-  setStatusPill("#exercise-status-pill", "運動", entry?.burnCalories !== null && entry?.burnCalories !== undefined);
+  const weightDone = hasWeightEntry(entry);
+  const foodDone = numberOrNull(entry?.intakeCalories) !== null;
+  const exerciseDone = hasExerciseEntry(entry);
+  const weight = getPrimaryWeight(entry);
+  setStatusPill("#weight-status-pill", "体重", weightDone, weightDone ? `${weight.toFixed(1)}kg` : "入力する");
+  setStatusPill("#food-status-pill", "食事", foodDone, foodDone ? `${Math.round(entry.intakeCalories)}kcal` : "入力する");
+  setStatusPill("#exercise-status-pill", "運動", exerciseDone, exerciseDone ? getExerciseDetailLabel(entry) : "入力する");
+  const completed = [weightDone, foodDone, exerciseDone].filter(Boolean).length;
+  const badge = document.querySelector("#today-completion-badge");
+  badge.textContent = completed === 3 ? "今日の記録完了 ✓" : `${completed} / 3`;
+  badge.classList.toggle("is-complete", completed === 3);
 }
 
-function setStatusPill(selector, label, isDone) {
+function setStatusPill(selector, label, isDone, detail) {
   const element = document.querySelector(selector);
   if (!element) return;
-  element.textContent = `${label} ${isDone ? "入力済み" : "未入力"}`;
+  element.innerHTML = `<span>${isDone ? "✓ " : ""}${label}</span><strong>${escapeHtml(detail)}</strong>`;
   element.classList.toggle("is-done", isDone);
 }
 
@@ -1633,7 +1630,7 @@ function renderCalorieDashboard(entry) {
     balanceLabel.className = "calorie-balance-label";
   } else {
     const diff = (intake || 0) - (burn || 0);
-    balanceLabel.textContent = diff >= 0 ? `差分 +${Math.round(diff)} kcal` : `差分 ${Math.round(diff)} kcal`;
+    balanceLabel.textContent = diff >= 0 ? `摂取−運動 +${Math.round(diff)} kcal` : `摂取−運動 ${Math.round(diff)} kcal`;
     balanceLabel.className = `calorie-balance-label ${diff > 0 ? "is-plus" : "is-minus"}`;
   }
 
@@ -1654,7 +1651,7 @@ function renderCalorieComboChart() {
     .sort((a, b) => a.date.localeCompare(b.date));
   const points = sampleChartPoints(rangePoints, 120);
 
-  svg.innerHTML = '<title id="calorie-chart-title">摂取カロリーは線グラフ、消費カロリーは棒グラフ、体重は線グラフ</title>';
+  svg.innerHTML = '<title id="calorie-chart-title">摂取カロリーは線グラフ、運動消費の推定値は棒グラフ、体重は線グラフ</title>';
   if (!points.length || !balanceSeries.size) {
     svg.hidden = true;
     empty.hidden = false;
@@ -1806,6 +1803,12 @@ function renderPfcSummary(entry) {
   detail.textContent = `P ${proteinPercent}%・F ${fatPercent}%・C ${carbsPercent}%`;
 }
 
+function openQuickRecord(scope) {
+  if (scope === "weight") openWeightModal();
+  else if (scope === "food") openEntryModal(foodModal, "food");
+  else openEntryModal(exerciseModal, "exercise");
+}
+
 function renderHistory() {
   const historyList = document.querySelector("#history-list");
   if (!entries.length) {
@@ -1817,13 +1820,12 @@ function renderHistory() {
     .slice(0, 14)
     .map((entry) => {
       const weight = getWeightHistoryLabel(entry);
-      const sleep = entry.sleep === null ? "睡眠未入力" : `${entry.sleep}時間睡眠`;
       const calories = getCalorieLabel(entry);
       const meals = getMealLogLabel(entry.meals || []);
       return `
         <article class="history-item">
           <div class="history-date">${formatDateLabel(entry.date)}</div>
-          <div class="history-detail">${weight} / ${sleep} / ${calories} / ${meals}</div>
+          <div class="history-detail">${weight} / ${calories} / ${meals}</div>
           <div class="score-pill">${scoreEntry(entry)}点</div>
           <div class="history-actions">
             <button type="button" data-edit-entry="weight" data-entry-date="${entry.date}">体重を編集</button>
@@ -1847,7 +1849,7 @@ function renderWeightOnlyHistory() {
     .map((entry) => `
       <article class="history-item">
         <div class="history-date">${formatDateLabel(entry.date)}</div>
-        <div class="history-detail">${getWeightHistoryLabel(entry)} / ${entry.sleep === null ? "睡眠未入力" : `${entry.sleep}時間睡眠`}</div>
+        <div class="history-detail">${getWeightHistoryLabel(entry)}</div>
         <div class="history-actions">
           <button type="button" data-edit-entry="weight" data-entry-date="${entry.date}">編集</button>
           <button type="button" data-delete-entry="weight" data-entry-date="${entry.date}">削除</button>
@@ -1899,7 +1901,7 @@ function renderExercisePage() {
   document.querySelector("#exercise-week-minutes").textContent = weeklyAmount || "--";
   document.querySelector("#exercise-week-minutes-detail").textContent = exerciseEntries.length ? `${exerciseEntries.length}日の記録から計算` : "時間・回数を入れると表示";
   document.querySelector("#exercise-week-burn").textContent = totalBurn ? `${Math.round(totalBurn)} kcal` : "-- kcal";
-  document.querySelector("#exercise-week-burn-detail").textContent = exerciseEntries.length ? "直近7日の合計" : "消費カロリーから計算";
+  document.querySelector("#exercise-week-burn-detail").textContent = exerciseEntries.length ? "直近7日の推定合計" : "運動消費の推定値";
   document.querySelector("#exercise-week-days").textContent = exerciseEntries.length ? `${exerciseEntries.length} 日` : "-- 日";
 
   if (hasExerciseEntry(todayEntry)) {
@@ -1992,7 +1994,7 @@ function saveCurrentExerciseAsPreset() {
     return;
   }
   if (caloriesPerBase === null) {
-    setSaveFeedback("exercise", "error", "基準消費カロリーを入力してください。");
+    setSaveFeedback("exercise", "error", "基準運動消費の推定値を入力してください。");
     document.querySelector("#exercise-preset-calories").focus();
     return;
   }
@@ -2867,10 +2869,9 @@ function fillFoodFormForDate(date) {
 
 function scoreEntry(entry) {
   let score = 0;
-  if (hasWeightEntry(entry)) score += 25;
-  if (hasFoodEntry(entry)) score += 25;
-  if (hasExerciseEntry(entry)) score += 25;
-  if (numberOrNull(entry.sleep) !== null) score += 25;
+  if (hasWeightEntry(entry)) score += 34;
+  if (hasFoodEntry(entry)) score += 33;
+  if (hasExerciseEntry(entry)) score += 33;
   return score;
 }
 
@@ -2918,15 +2919,15 @@ function getCalorieLabel(entry) {
   if (intake === null && burn === null) return "カロリー未入力";
   const intakeText = intake === null ? "--" : Math.round(intake);
   const burnText = burn === null ? "--" : Math.round(burn);
-  return `摂取${intakeText} / 消費${burnText}kcal`;
+  return `摂取${intakeText} / 運動消費${burnText}kcal`;
 }
 
 function getScoreDetail(score) {
-  if (score === null) return "体重・食事・運動・睡眠";
+  if (score === null) return "体重・食事・運動";
   if (score >= 85) return "今週はかなり安定";
   if (score >= 70) return "記録がしっかり続いています";
   if (score >= 55) return "小さな行動を増やしたい";
-  return "まず睡眠と食事を整える";
+  return "まず1項目だけ記録してみる";
 }
 
 function getPaceLabel(pace) {
@@ -2950,6 +2951,165 @@ function getEstimatedTargetDate(startWeight, goalWeight, pace, startDate) {
   const date = new Date(`${startDate || isoToday}T00:00:00`);
   date.setDate(date.getDate() + weeks * 7);
   return new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric" }).format(date);
+}
+
+function renderFoodShortcuts() {
+  if (!copyPreviousMealButton || !recentFoodList) return;
+  const date = foodDateInput.value || isoToday;
+  const previousDate = new Date(`${date}T00:00:00`);
+  previousDate.setDate(previousDate.getDate() - 1);
+  const previous = entries.find((entry) => entry.date === toIsoDate(previousDate) && hasFoodEntry(entry));
+  copyPreviousMealButton.disabled = !previous;
+  document.querySelector("#copy-previous-meal-help").textContent = previous
+    ? `${formatDateLabel(previous.date)}の食事を複製できます。`
+    : "前日に記録があると使えます。";
+
+  const seen = new Set();
+  const recent = entries.flatMap((entry) => Object.values(normalizeMealItems(entry.mealItems)).flat())
+    .filter((item) => item.name && !seen.has(item.name) && seen.add(item.name))
+    .slice(0, 8);
+  recentFoodList.innerHTML = recent.length
+    ? `<strong>最近使った食品</strong><div>${recent.map((item) => `<button type="button" data-recent-food="${escapeHtml(item.name)}">${escapeHtml(item.name)}</button>`).join("")}</div>`
+    : "";
+  recentFoodList.querySelectorAll("[data-recent-food]").forEach((button) => button.addEventListener("click", () => {
+    const item = recent.find((candidate) => candidate.name === button.dataset.recentFood);
+    if (!item) return;
+    document.querySelector("#food-item-name").value = item.name;
+    document.querySelector("#food-item-amount").value = item.amount || "";
+    document.querySelector("#food-item-calories").value = item.calories ?? "";
+    document.querySelector("#food-item-protein").value = item.protein ?? "";
+    document.querySelector("#food-item-fat").value = item.fat ?? "";
+    document.querySelector("#food-item-carbs").value = item.carbs ?? "";
+  }));
+}
+
+function copyPreviousDayFood() {
+  const date = foodDateInput.value || isoToday;
+  const previousDate = new Date(`${date}T00:00:00`);
+  previousDate.setDate(previousDate.getDate() - 1);
+  const previous = entries.find((entry) => entry.date === toIsoDate(previousDate) && hasFoodEntry(entry));
+  if (!previous) return;
+  foodMealItemsDraft = structuredClone(normalizeMealItems(previous.mealItems));
+  renderFoodItems();
+  updateNutritionSummary();
+  updateIntakeCaloriesTotal();
+  setSaveFeedback("food", "success", "前日の食事をコピーしました。内容を確認して保存してください。");
+}
+
+function renderActionInsights() {
+  const mount = document.querySelector("#action-insights");
+  if (!mount) return;
+  const week = getRecentEntries(7);
+  const priorStart = new Date(today);
+  priorStart.setDate(priorStart.getDate() - 13);
+  const previousWeek = entries.filter((entry) => {
+    const date = new Date(`${entry.date}T00:00:00`);
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - 7);
+    return date >= priorStart && date <= cutoff;
+  });
+  const average = (list) => {
+    const values = list.filter(hasWeightEntry).map(getPrimaryWeight);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  };
+  const currentAverage = average(week);
+  const previousAverage = average(previousWeek);
+  const messages = [];
+  if (currentAverage !== null && previousAverage !== null) {
+    const diff = currentAverage - previousAverage;
+    messages.push(`7日平均は前週より${diff > 0 ? "+" : ""}${diff.toFixed(1)}kgです。日々の増減より平均を見ましょう。`);
+  }
+  const morningNight = week.filter((entry) => numberOrNull(entry.weightMorning) !== null && numberOrNull(entry.weightNight) !== null);
+  if (morningNight.length) {
+    const gap = morningNight.reduce((sum, entry) => sum + entry.weightNight - entry.weightMorning, 0) / morningNight.length;
+    messages.push(`夜は朝より平均${gap >= 0 ? "+" : ""}${gap.toFixed(1)}kgです。朝夜は分けて比較できます。`);
+  }
+  const missing = [!hasWeightEntry(entries.find((e) => e.date === isoToday)) && "体重", !hasFoodEntry(entries.find((e) => e.date === isoToday)) && "食事", !hasExerciseEntry(entries.find((e) => e.date === isoToday)) && "運動"].filter(Boolean);
+  if (missing.length) messages.push(`今日は${missing.join("・")}が未入力です。まず1つだけ残してみましょう。`);
+  mount.innerHTML = messages.slice(0, 2).map((message) => `<p>${escapeHtml(message)}</p>`).join("");
+}
+
+function exportFullBackup() {
+  const payload = { version: 1, exportedAt: new Date().toISOString(), profile, entries, exercisePresets, foodPresets };
+  downloadJson(payload, `my-diet-notebook-backup-${isoToday}.json`);
+  setAppSettingsFeedback("success", "バックアップを書き出しました。");
+}
+
+function downloadJson(payload, filename) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importFullBackup() {
+  const file = importBackupFile.files?.[0];
+  if (!file) return;
+  try {
+    const payload = JSON.parse(await file.text());
+    if (!Array.isArray(payload.entries) || !payload.profile || typeof payload.profile !== "object") throw new Error("invalid");
+    if (!window.confirm(`${payload.entries.length}日分の記録で現在の端末データを置き換えますか？`)) return;
+    entries = payload.entries.map(normalizeEntryWeights).filter((entry) => entry?.date);
+    profile = payload.profile;
+    exercisePresets = normalizeExercisePresetList(payload.exercisePresets || []);
+    foodPresets = normalizeFoodPresetList(payload.foodPresets || []);
+    entries.forEach((entry) => dirtyEntryDates.add(entry.date));
+    settingsDirty = true;
+    saveProfileToDevice(); saveExercisePresets(); saveFoodPresets(); saveEntries();
+    fillProfileForm(); fillAllFormsForDate(isoToday); render();
+    setAppSettingsFeedback("success", "バックアップを復元しました。");
+  } catch {
+    setAppSettingsFeedback("error", "このファイルは復元できません。正しいバックアップを選んでください。");
+  } finally {
+    importBackupFile.value = "";
+  }
+}
+
+function setAppSettingsFeedback(type, message) {
+  appSettingsFeedback.textContent = message;
+  appSettingsFeedback.className = `cloud-feedback is-${type}`;
+}
+
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.querySelector("#install-app").hidden = true;
+}
+
+async function enableReminder() {
+  if (!("Notification" in window)) return setAppSettingsFeedback("error", "このブラウザーは通知に対応していません。");
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") return setAppSettingsFeedback("error", "通知が許可されませんでした。");
+  saveReminderSettings();
+  setAppSettingsFeedback("success", "リマインダーを有効にしました。アプリ起動中に指定時刻を確認します。");
+}
+
+function saveReminderSettings() {
+  localStorage.setItem("my-diet-notebook:reminder-time", document.querySelector("#reminder-time").value);
+}
+
+function restoreReminderSettings() {
+  const input = document.querySelector("#reminder-time");
+  input.value = localStorage.getItem("my-diet-notebook:reminder-time") || "21:00";
+  window.setInterval(checkReminder, 60000);
+}
+
+function checkReminder() {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const now = new Date();
+  const current = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const key = `my-diet-notebook:reminded:${isoToday}`;
+  if (current !== document.querySelector("#reminder-time").value || localStorage.getItem(key)) return;
+  new Notification("My Diet Notebook", { body: "今日の体重・食事・運動を1つだけ記録しませんか？", icon: "icons/icon.svg" });
+  localStorage.setItem(key, "1");
+}
+
+function registerServiceWorker() {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js").catch(() => {});
 }
 
 function numberOrNull(value) {
