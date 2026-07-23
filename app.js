@@ -79,6 +79,8 @@ const selectedMealItemCount = document.querySelector("#selected-meal-item-count"
 const profileStorageKey = "my-diet-notebook:profile:v2";
 const exercisePresetStorageKey = "my-diet-notebook:exercise-presets:v2";
 const foodPresetStorageKey = "my-diet-notebook:food-presets:v1";
+const presetSeedStorageKey = "my-diet-notebook:preset-seed-version:v1";
+const currentPresetSeedVersion = 1;
 const deletedEntriesStorageKey = "my-diet-notebook:deleted-entries:v1";
 const settingsUpdatedStorageKey = "my-diet-notebook:settings-updated:v1";
 const legacyCloudTable = "diet_user_data";
@@ -96,6 +98,7 @@ let deletedEntries = {};
 let profile = {};
 let exercisePresets = getDefaultExercisePresets();
 let foodPresets = getDefaultFoodPresets();
+let appliedPresetSeedVersion = 0;
 let settingsUpdatedAt = new Date(0).toISOString();
 let comboChartRangeDays = 7;
 let chartView = "balance";
@@ -622,10 +625,10 @@ function loadProfile() {
 function loadExercisePresets() {
   try {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(exercisePresetStorageKey)));
-    if (!Array.isArray(stored)) return getDefaultExercisePresets();
+    if (!Array.isArray(stored)) return [];
     return normalizeExercisePresetList(stored);
   } catch {
-    return getDefaultExercisePresets();
+    return [];
   }
 }
 
@@ -691,7 +694,13 @@ function commitEntry(entry) {
 }
 
 function getDefaultExercisePresets() {
-  return [];
+  return [
+    { id: "default-exercise-walking-v1", name: "ウォーキング", exerciseName: "ウォーキング", baseUnit: "minute", baseAmount: 10, caloriesPerBase: 35 },
+    { id: "default-exercise-stretch-v1", name: "ストレッチ", exerciseName: "ストレッチ", baseUnit: "minute", baseAmount: 10, caloriesPerBase: 25 },
+    { id: "default-exercise-strength-v1", name: "自重筋トレ", exerciseName: "自重筋トレ", baseUnit: "minute", baseAmount: 10, caloriesPerBase: 45 },
+    { id: "default-exercise-jogging-v1", name: "ジョギング", exerciseName: "ジョギング", baseUnit: "minute", baseAmount: 10, caloriesPerBase: 80 },
+    { id: "default-exercise-squat-v1", name: "スクワット", exerciseName: "スクワット", baseUnit: "rep", baseAmount: 10, caloriesPerBase: 5 },
+  ].map(normalizeExercisePreset);
 }
 
 function normalizeExercisePreset(preset) {
@@ -740,7 +749,15 @@ function saveExercisePresets() {
 }
 
 function getDefaultFoodPresets() {
-  return [];
+  return [
+    { id: "default-food-rice-v1", name: "ご飯（茶碗1杯・150g）", calories: 234 },
+    { id: "default-food-bread-v1", name: "食パン（6枚切り1枚）", calories: 149 },
+    { id: "default-food-egg-v1", name: "卵（1個）", calories: 76 },
+    { id: "default-food-natto-v1", name: "納豆（1パック）", calories: 90 },
+    { id: "default-food-chicken-v1", name: "鶏むね肉（皮なし・100g）", calories: 113 },
+    { id: "default-food-banana-v1", name: "バナナ（1本）", calories: 93 },
+    { id: "default-food-miso-soup-v1", name: "みそ汁（1杯）", calories: 40 },
+  ].map(normalizeFoodPreset);
 }
 
 function loadFoodPresets() {
@@ -748,9 +765,9 @@ function loadFoodPresets() {
     const stored = JSON.parse(localStorage.getItem(getUserStorageKey(foodPresetStorageKey)));
     return Array.isArray(stored)
       ? normalizeFoodPresetList(stored)
-      : getDefaultFoodPresets();
+      : [];
   } catch {
-    return getDefaultFoodPresets();
+    return [];
   }
 }
 
@@ -777,6 +794,29 @@ function normalizeFoodPresetList(presets) {
 function saveFoodPresets() {
   if (!activeUser) return;
   localStorage.setItem(getUserStorageKey(foodPresetStorageKey), JSON.stringify(foodPresets));
+}
+
+function loadPresetSeedVersion() {
+  const version = Number(localStorage.getItem(getUserStorageKey(presetSeedStorageKey)));
+  return Number.isInteger(version) && version >= 0 ? version : 0;
+}
+
+function savePresetSeedVersion() {
+  if (!activeUser) return;
+  localStorage.setItem(getUserStorageKey(presetSeedStorageKey), String(appliedPresetSeedVersion));
+}
+
+function ensureInitialPresets() {
+  if (!activeUser || appliedPresetSeedVersion >= currentPresetSeedVersion) return false;
+
+  if (!exercisePresets.length) exercisePresets = getDefaultExercisePresets();
+  if (!foodPresets.length) foodPresets = getDefaultFoodPresets();
+  appliedPresetSeedVersion = currentPresetSeedVersion;
+  saveExercisePresets();
+  saveFoodPresets();
+  savePresetSeedVersion();
+  touchSettings();
+  return true;
 }
 
 function saveProfileToDevice() {
@@ -1190,6 +1230,9 @@ async function syncFromCloud() {
         const legacyEntries = Array.isArray(legacyData) ? legacyData : legacyData.entries;
         entries = mergeEntries(entries, Array.isArray(legacyEntries) ? legacyEntries : []);
         if (legacyData.profile) profile = legacyData.profile;
+        appliedPresetSeedVersion = Number.isInteger(Number(legacyData.presetSeedVersion))
+          ? Number(legacyData.presetSeedVersion)
+          : appliedPresetSeedVersion;
         if (Array.isArray(legacyData.exercisePresets)) {
           exercisePresets = normalizeExercisePresetList(legacyData.exercisePresets);
         }
@@ -1207,16 +1250,20 @@ async function syncFromCloud() {
         profile = cloudSettings.payload.profile || {};
         exercisePresets = Array.isArray(cloudSettings.payload.exercisePresets)
           ? normalizeExercisePresetList(cloudSettings.payload.exercisePresets)
-          : getDefaultExercisePresets();
+          : [];
         foodPresets = Array.isArray(cloudSettings.payload.foodPresets)
           ? normalizeFoodPresetList(cloudSettings.payload.foodPresets)
-          : getDefaultFoodPresets();
+          : [];
+        appliedPresetSeedVersion = Number.isInteger(Number(cloudSettings.payload.presetSeedVersion))
+          ? Number(cloudSettings.payload.presetSeedVersion)
+          : 0;
         settingsUpdatedAt = cloudSettings.updated_at;
       } else {
         settingsDirty = true;
       }
     }
 
+    ensureInitialPresets();
     purgeLegacySampleData();
     entries.sort((a, b) => b.date.localeCompare(a.date));
     localStorage.setItem(getUserStorageKey(storageKey), JSON.stringify(entries));
@@ -1224,6 +1271,7 @@ async function syncFromCloud() {
     saveProfileToDevice();
     saveExercisePresets();
     saveFoodPresets();
+    savePresetSeedVersion();
     localStorage.setItem(getUserStorageKey(settingsUpdatedStorageKey), settingsUpdatedAt);
     await pushEntriesToCloud();
     setSyncState("同期済み");
@@ -1276,7 +1324,7 @@ async function pushEntriesToCloud() {
       .from(settingsCloudTable)
       .upsert({
         user_id: activeUser.id,
-        payload: { profile, exercisePresets, foodPresets },
+        payload: { profile, exercisePresets, foodPresets, presetSeedVersion: appliedPresetSeedVersion },
         updated_at: settingsUpdatedAt,
       }, { onConflict: "user_id" });
     if (settingsError) throw settingsError;
@@ -1390,6 +1438,7 @@ async function applySession(session) {
     profile = {};
     exercisePresets = getDefaultExercisePresets();
     foodPresets = getDefaultFoodPresets();
+    appliedPresetSeedVersion = 0;
     settingsUpdatedAt = new Date(0).toISOString();
     authScreen.hidden = false;
     onboarding.hidden = true;
@@ -1412,6 +1461,7 @@ async function applySession(session) {
   profile = loadProfile();
   exercisePresets = loadExercisePresets();
   foodPresets = loadFoodPresets();
+  appliedPresetSeedVersion = loadPresetSeedVersion();
   settingsUpdatedAt = loadSettingsUpdatedAt();
   purgeLegacySampleData();
   accountEmail.textContent = activeUser.email || activeUser.id;
@@ -1445,6 +1495,7 @@ function clearCurrentUserCache() {
     profileStorageKey,
     exercisePresetStorageKey,
     foodPresetStorageKey,
+    presetSeedStorageKey,
     deletedEntriesStorageKey,
     settingsUpdatedStorageKey,
   ].forEach((key) => localStorage.removeItem(getUserStorageKey(key)));
@@ -3030,7 +3081,15 @@ function renderActionInsights() {
 }
 
 function exportFullBackup() {
-  const payload = { version: 1, exportedAt: new Date().toISOString(), profile, entries, exercisePresets, foodPresets };
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    profile,
+    entries,
+    exercisePresets,
+    foodPresets,
+    presetSeedVersion: appliedPresetSeedVersion,
+  };
   downloadJson(payload, `my-diet-notebook-backup-${isoToday}.json`);
   setAppSettingsFeedback("success", "バックアップを書き出しました。");
 }
@@ -3055,9 +3114,10 @@ async function importFullBackup() {
     profile = payload.profile;
     exercisePresets = normalizeExercisePresetList(payload.exercisePresets || []);
     foodPresets = normalizeFoodPresetList(payload.foodPresets || []);
+    appliedPresetSeedVersion = currentPresetSeedVersion;
     entries.forEach((entry) => dirtyEntryDates.add(entry.date));
     settingsDirty = true;
-    saveProfileToDevice(); saveExercisePresets(); saveFoodPresets(); saveEntries();
+    saveProfileToDevice(); saveExercisePresets(); saveFoodPresets(); savePresetSeedVersion(); saveEntries();
     fillProfileForm(); fillAllFormsForDate(isoToday); render();
     setAppSettingsFeedback("success", "バックアップを復元しました。");
   } catch {
