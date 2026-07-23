@@ -147,6 +147,14 @@
               <div class="setting-action-card"><div><strong>ホーム画面に追加</strong><p>アプリのように素早く起動できます。</p></div><button id="install-app" class="ghost-button" type="button" hidden>インストール</button></div>
               <div class="setting-action-card"><div><strong>記録リマインダー</strong><p>指定時刻に、この端末で記録を促します。</p></div><label><span>時刻</span><input id="reminder-time" type="time" value="21:00"></label><button id="enable-reminder" class="ghost-button" type="button">通知を有効にする</button></div>
               <div class="setting-action-card"><div><strong>バックアップ</strong><p>プロフィール、記録、プリセットをJSONで保存・復元します。</p></div><div class="account-secondary-actions"><button id="export-backup" class="ghost-button" type="button">書き出す</button><button id="import-backup" class="ghost-button" type="button">復元する</button><input id="import-backup-file" type="file" accept="application/json,.json" hidden></div></div>
+              <div class="setting-action-card fitbit-setting-card">
+                <div><strong>Google Health歩数連携</strong><p id="fitbit-status">接続状態を確認しています。</p><small id="fitbit-last-sync"></small></div>
+                <div class="account-secondary-actions">
+                  <button id="fitbit-connect" class="primary-button" type="button">Google Healthを連携</button>
+                  <button id="fitbit-sync" class="ghost-button" type="button" hidden>歩数を同期</button>
+                  <button id="fitbit-disconnect" class="danger-button" type="button" hidden>連携解除</button>
+                </div>
+              </div>
               <p id="app-settings-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
             </div>
           </section>
@@ -314,6 +322,11 @@
                 <span>記録スコア</span>
                 <strong id="weekly-score">--</strong>
                 <small id="weekly-score-detail">体重・食事・運動</small>
+              </article>
+              <article class="metric fitbit-steps-metric">
+                <span>今日の歩数</span>
+                <strong id="fitbit-steps">-- 歩</strong>
+                <small id="fitbit-steps-detail">Google Healthを連携すると表示</small>
               </article>
               <article class="metric pfc-metric">
                 <span>PFCバランス</span>

@@ -51,6 +51,11 @@ const recentFoodList = document.querySelector("#recent-food-list");
 const pendingSyncCount = document.querySelector("#pending-sync-count");
 const appSettingsFeedback = document.querySelector("#app-settings-feedback");
 const importBackupFile = document.querySelector("#import-backup-file");
+const fitbitConnectButton = document.querySelector("#fitbit-connect");
+const fitbitSyncButton = document.querySelector("#fitbit-sync");
+const fitbitDisconnectButton = document.querySelector("#fitbit-disconnect");
+const fitbitStatus = document.querySelector("#fitbit-status");
+const fitbitLastSync = document.querySelector("#fitbit-last-sync");
 const saveFoodPresetButton = document.querySelector("#save-food-preset");
 const cancelFoodPresetEditButton = document.querySelector("#cancel-food-preset-edit");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
@@ -115,6 +120,7 @@ let selectedFoodMeal = "breakfast";
 let foodMealItemsDraft = createEmptyMealItems();
 let exerciseItemsDraft = [];
 let deferredInstallPrompt = null;
+let fitbitConnected = false;
 
 [weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
   input.value = isoToday;
@@ -228,6 +234,9 @@ document.querySelector("[data-open-settings-shortcut]").addEventListener("click"
 document.querySelector("#export-backup").addEventListener("click", exportFullBackup);
 document.querySelector("#import-backup").addEventListener("click", () => importBackupFile.click());
 importBackupFile.addEventListener("change", importFullBackup);
+fitbitConnectButton.addEventListener("click", connectFitbit);
+fitbitSyncButton.addEventListener("click", () => syncFitbitSteps(30));
+fitbitDisconnectButton.addEventListener("click", disconnectFitbit);
 document.querySelector("#install-app").addEventListener("click", installApp);
 document.querySelector("#enable-reminder").addEventListener("click", enableReminder);
 document.querySelector("#reminder-time").addEventListener("change", saveReminderSettings);
@@ -680,6 +689,8 @@ function getOrCreateEntry(date) {
     meal: previous?.meal ?? 2,
     meals: previous?.meals ?? [],
     habits: previous?.habits ?? [],
+    fitbitSteps: previous?.fitbitSteps ?? null,
+    fitbitSyncedAt: previous?.fitbitSyncedAt ?? null,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -900,6 +911,7 @@ function openSettings() {
   accountEmail.textContent = activeUser?.email || "--";
   switchSettingsTab("profile");
   settingsScreen.hidden = false;
+  refreshFitbitStatus();
 }
 
 function closeSettings() {
@@ -1388,6 +1400,115 @@ function getCloudErrorMessage(error) {
   return "クラウド同期に失敗しました。";
 }
 
+async function invokeFitbitFunction(name, body) {
+  if (!supabaseClient || !activeUser) throw new Error("ログインが必要です。");
+  const { data, error } = await supabaseClient.functions.invoke(name, { body });
+  if (error) {
+    let message = error.message;
+    try {
+      const response = error.context;
+      const payload = response && typeof response.json === "function" ? await response.json() : null;
+      message = payload?.error || message;
+    } catch {
+      // Use the function client's original message.
+    }
+    throw new Error(message || "Fitbitとの通信に失敗しました。");
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+async function refreshFitbitStatus() {
+  if (!activeUser) return;
+  fitbitStatus.textContent = "接続状態を確認しています。";
+  try {
+    const data = await invokeFitbitFunction("fitbit-sync", { action: "status" });
+    updateFitbitControls(Boolean(data.connected), data.lastSyncedAt);
+  } catch (error) {
+    fitbitStatus.textContent = "Google Health機能の設定を確認してください。";
+    fitbitLastSync.textContent = error.message;
+  }
+}
+
+function updateFitbitControls(connected, lastSyncedAt = null) {
+  fitbitConnected = connected;
+  fitbitStatus.textContent = connected ? "Google Healthと連携済みです。" : "まだGoogle Healthと連携していません。";
+  fitbitLastSync.textContent = lastSyncedAt
+    ? `最終同期: ${new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(new Date(lastSyncedAt))}`
+    : "";
+  fitbitConnectButton.hidden = connected;
+  fitbitSyncButton.hidden = !connected;
+  fitbitDisconnectButton.hidden = !connected;
+}
+
+async function connectFitbit() {
+  fitbitConnectButton.disabled = true;
+  fitbitStatus.textContent = "Google Healthの認証画面を準備しています。";
+  try {
+    const returnUrl = `${location.origin}${location.pathname}`;
+    const data = await invokeFitbitFunction("fitbit-auth", { returnUrl });
+    location.assign(data.authorizationUrl);
+  } catch (error) {
+    fitbitStatus.textContent = error.message;
+    fitbitConnectButton.disabled = false;
+  }
+}
+
+async function syncFitbitSteps(days = 30) {
+  fitbitSyncButton.disabled = true;
+    fitbitStatus.textContent = "Google Healthから歩数を同期しています。";
+  try {
+    const data = await invokeFitbitFunction("fitbit-sync", { action: "sync", days, endDate: isoToday });
+    const syncedAt = data.lastSyncedAt || new Date().toISOString();
+    (data.steps || []).forEach((item) => {
+      if (!item?.date) return;
+      const entry = getOrCreateEntry(item.date);
+      entry.fitbitSteps = Math.max(0, Math.round(Number(item.steps) || 0));
+      entry.fitbitSyncedAt = syncedAt;
+      commitEntry(entry);
+    });
+    saveEntries();
+    render();
+    updateFitbitControls(true, syncedAt);
+    fitbitStatus.textContent = `${data.steps?.length || 0}日分の歩数を同期しました。`;
+  } catch (error) {
+    fitbitStatus.textContent = error.message;
+  } finally {
+    fitbitSyncButton.disabled = false;
+  }
+}
+
+async function disconnectFitbit() {
+  if (!window.confirm("Google Health連携を解除しますか？ 同期済みの歩数は記録に残ります。")) return;
+  fitbitDisconnectButton.disabled = true;
+  try {
+    await invokeFitbitFunction("fitbit-sync", { action: "disconnect" });
+    updateFitbitControls(false);
+  } catch (error) {
+    fitbitStatus.textContent = error.message;
+  } finally {
+    fitbitDisconnectButton.disabled = false;
+  }
+}
+
+async function handleFitbitReturn() {
+  const url = new URL(location.href);
+  const result = url.searchParams.get("fitbit");
+  if (!result) return;
+  url.searchParams.delete("fitbit");
+  history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  openSettings();
+  switchSettingsTab("app");
+  if (result === "connected") {
+    updateFitbitControls(true);
+    await syncFitbitSteps(30);
+  } else if (result === "cancelled") {
+    fitbitStatus.textContent = "Google Health連携をキャンセルしました。";
+  } else {
+    fitbitStatus.textContent = "Google Health連携を完了できませんでした。もう一度お試しください。";
+  }
+}
+
 function hasSupabaseConfig() {
   return Boolean(
     appConfig.supabaseUrl
@@ -1440,6 +1561,7 @@ async function applySession(session) {
     foodPresets = getDefaultFoodPresets();
     appliedPresetSeedVersion = 0;
     settingsUpdatedAt = new Date(0).toISOString();
+    fitbitConnected = false;
     authScreen.hidden = false;
     onboarding.hidden = true;
     settingsScreen.hidden = true;
@@ -1470,6 +1592,7 @@ async function applySession(session) {
   showOnboardingIfNeeded();
   render();
   await syncFromCloud();
+  await handleFitbitReturn();
 }
 
 function importLegacyDeviceData() {
@@ -1637,6 +1760,17 @@ function renderSummary() {
   document.querySelector("#habit-progress-label").textContent = `${habitRatio}%`;
   renderPfcSummary(selected);
   renderWeeklyReport(weekEntries);
+  renderFitbitSteps(selected);
+}
+
+function renderFitbitSteps(entry) {
+  const steps = numberOrNull(entry?.fitbitSteps);
+  document.querySelector("#fitbit-steps").textContent = steps === null
+    ? "-- 歩"
+    : `${Math.round(steps).toLocaleString("ja-JP")} 歩`;
+  document.querySelector("#fitbit-steps-detail").textContent = steps === null
+    ? "Google Healthを連携すると表示"
+    : "Google Healthの日別合計";
 }
 
 function renderWeeklyReport(weekEntries) {

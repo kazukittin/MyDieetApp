@@ -55,3 +55,31 @@ GitHub Pagesでサブディレクトリを使う場合は、リポジトリ名�
 - `config.js`
 
 利用者はログイン画面から各自のメールアドレスで登録します。ログイン後のデータはユーザーID別に分離され、端末内キャッシュも別々に保存されます。
+
+## 5. 自分専用のGoogle Health歩数連携
+
+Google CloudでGoogle Health APIを有効にし、OAuthクライアントを1件登録します。
+
+- Application Type: `Web application`
+- Authorized redirect URI: `https://YOUR_PROJECT.supabase.co/functions/v1/fitbit-callback`
+- Test user: 自分のGoogleアカウント
+
+アプリが要求する権限は歩数取得に必要な`googlehealth.activity_and_fitness.readonly`だけです。
+
+Supabase CLIでGoogleのClient ID、Client Secret、アプリの公開URLをSecretsへ登録します。Client Secretは`config.js`やGitHubへ保存しないでください。
+
+```powershell
+supabase secrets set GOOGLE_HEALTH_CLIENT_ID="YOUR_CLIENT_ID"
+supabase secrets set GOOGLE_HEALTH_CLIENT_SECRET="YOUR_CLIENT_SECRET"
+supabase secrets set GOOGLE_HEALTH_APP_URL="https://YOUR_PUBLIC_APP_URL/"
+```
+
+SQL Editorで最新版の`SUPABASE_SETUP.sql`を実行してから、3つのEdge Functionをデプロイします。
+
+```powershell
+supabase functions deploy fitbit-auth
+supabase functions deploy fitbit-callback --no-verify-jwt
+supabase functions deploy fitbit-sync
+```
+
+公開アプリへログインし、`設定 → アプリ → Google Health歩数連携`から接続します。初回接続時に直近30日分、その後は「歩数を同期」で直近30日分を再取得します。同期済みの日付は最新のGoogle Health値で更新され、食事・体重・運動の手入力には影響しません。

@@ -105,3 +105,31 @@ $$;
 
 revoke all on function public.delete_my_account() from public;
 grant execute on function public.delete_my_account() to authenticated;
+
+-- Google Health OAuth credentials are server-only. Browser roles receive no grants.
+create table if not exists public.google_health_connections (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  access_token text not null,
+  refresh_token text not null,
+  expires_at timestamptz not null,
+  scope text not null default 'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
+  last_synced_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.google_health_oauth_states (
+  state text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  return_url text not null,
+  expires_at timestamptz not null default (now() + interval '10 minutes'),
+  created_at timestamptz not null default now()
+);
+
+alter table public.google_health_connections enable row level security;
+alter table public.google_health_oauth_states enable row level security;
+revoke all on table public.google_health_connections from anon, authenticated;
+revoke all on table public.google_health_oauth_states from anon, authenticated;
+
+create index if not exists google_health_oauth_states_expires_at_idx
+on public.google_health_oauth_states (expires_at);
