@@ -1,8 +1,9 @@
 import { adminClient, exchangeGoogleHealthToken, googleHealthRedirectUri, tokenExpiry } from "../_shared/fitbit.ts";
 
-function redirect(url: string, result: string) {
+function redirect(url: string, result: string, errorCode = "") {
   const target = new URL(url);
   target.searchParams.set("fitbit", result);
+  if (errorCode) target.searchParams.set("fitbit_error", errorCode);
   return Response.redirect(target.toString(), 302);
 }
 
@@ -39,7 +40,16 @@ Deno.serve(async (req) => {
     }, { onConflict: "user_id" });
     if (error) throw error;
     return redirect(pending.return_url, "connected");
-  } catch {
-    return redirect(pending.return_url, "error");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Google Health OAuth callback failed:", message);
+    const errorCode = message.includes("Refresh token")
+      ? "missing_refresh_token"
+      : message.includes("invalid_client")
+        ? "invalid_client"
+        : message.includes("invalid_grant")
+          ? "invalid_grant"
+          : "callback_failed";
+    return redirect(pending.return_url, "error", errorCode);
   }
 });
