@@ -1511,6 +1511,7 @@ async function handleFitbitReturn() {
       invalid_client: "Client IDとClient Secretの組み合わせが一致していません。",
       invalid_grant: "認証コードを交換できませんでした。もう一度連携してください。",
       missing_refresh_token: "継続同期用の許可を取得できませんでした。Google側のアクセスを解除してやり直してください。",
+      storage_failed: "Google Healthの接続先テーブルを確認できませんでした。",
       callback_failed: "Google Healthの接続情報を保存できませんでした。",
     };
     fitbitStatus.textContent = messages[errorCode] || "Google Health連携を完了できませんでした。もう一度お試しください。";

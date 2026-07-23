@@ -47,8 +47,10 @@ Deno.serve(async (req) => {
       ? "missing_refresh_token"
       : message.includes("invalid_client")
         ? "invalid_client"
-        : message.includes("invalid_grant")
+      : message.includes("invalid_grant")
           ? "invalid_grant"
+          : message.includes("google_health_connections")
+            ? "storage_failed"
           : "callback_failed";
     return redirect(pending.return_url, "error", errorCode);
   }

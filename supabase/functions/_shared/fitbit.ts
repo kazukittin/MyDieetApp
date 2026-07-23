@@ -51,7 +51,11 @@ export async function exchangeGoogleHealthToken(params: URLSearchParams) {
     body: params,
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload?.error_description || "Google Health認証に失敗しました。");
+  if (!response.ok) {
+    const code = String(payload?.error || "token_exchange_failed");
+    const description = String(payload?.error_description || "Google Health認証に失敗しました。");
+    throw new Error(`${code}: ${description}`);
+  }
   return payload;
 }
 
