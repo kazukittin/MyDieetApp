@@ -143,7 +143,7 @@ button {
 .record-modal {
   position: fixed;
   inset: 0;
-  z-index: 15;
+  z-index: 40;
   display: grid;
   place-items: center;
   padding: 18px;
@@ -2077,6 +2077,7 @@ legend {
 
 .mobile-bottom-nav { display: none; }
 .auth-screen:not([hidden]) ~ .mobile-bottom-nav { display: none; }
+.modal-open .mobile-bottom-nav { display: none; }
 
 .today-first-section {
   margin-bottom: 18px;
