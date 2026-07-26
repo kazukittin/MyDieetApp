@@ -8,7 +8,7 @@
     <title>My Diet Notebook</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css?v=20260724-1">
+    <link rel="stylesheet" href="styles.css?v=20260726-assistant-record-v1">
   </head>
   <body>
     <div id="auth-screen" class="auth-screen">
@@ -219,7 +219,7 @@
           <span>毎日の記録を、ひとつの画面で</span>
         </div>
         <div class="app-nav-actions">
-        <button class="tab-button weight-quick-button" type="button" data-open-record-menu>＋ 記録する</button>
+        <button class="tab-button weight-quick-button" type="button" data-open-assistant-record>ChatGPT記録用</button>
         <button id="open-settings" class="tab-button" type="button">設定</button>
         </div>
       </nav>
@@ -803,6 +803,10 @@
           <button id="close-record-menu" class="ghost-button" type="button">閉じる</button>
         </div>
         <div class="record-choice-grid">
+          <button class="assistant-record-choice" type="button" data-open-assistant-record>
+            <strong>まとめて記録</strong>
+            <span>ChatGPT用。日付・体重・食事・運動を1画面で保存</span>
+          </button>
           <button type="button" data-record-choice="weight">
             <strong>体重</strong>
             <span>朝・夜の体重</span>
@@ -819,16 +823,105 @@
       </section>
     </div>
 
+    <div id="assistant-record-modal" class="record-modal" hidden>
+      <form id="assistant-record-form" class="record-modal-card assistant-record-card" role="dialog" aria-modal="true" aria-labelledby="assistant-record-title" autocomplete="off">
+        <div class="settings-header">
+          <div>
+            <p class="section-kicker">ChatGPT record</p>
+            <h2 id="assistant-record-title">まとめて記録</h2>
+            <p>ChatGPTが体重・食事・運動を一度に登録するための画面です。</p>
+          </div>
+          <button id="close-assistant-record" class="ghost-button" type="button" aria-label="ChatGPT記録用を閉じる">閉じる</button>
+        </div>
+
+        <section class="assistant-record-date-bar" aria-label="記録対象">
+          <label class="modal-date-field">
+            <span>記録日</span>
+            <input type="date" id="assistant-record-date" name="date" required>
+          </label>
+          <div class="assistant-sync-card" aria-label="同期状態">
+            <span>クラウド</span>
+            <strong id="assistant-sync-status">ログイン待ち</strong>
+            <small>未送信 <b id="assistant-pending-sync-count">0件</b></small>
+          </div>
+        </section>
+
+        <section class="assistant-record-section" aria-labelledby="assistant-weight-title">
+          <div class="assistant-record-section-heading">
+            <div>
+              <span>Weight</span>
+              <h3 id="assistant-weight-title">体重</h3>
+            </div>
+            <small>不明な欄は空欄のまま保存</small>
+          </div>
+          <div class="field-row weight-log-grid">
+            <label class="field-card">
+              <span>朝の体重 kg</span>
+              <input type="number" id="assistant-weight-morning" min="20" max="250" step="0.1">
+            </label>
+            <label class="field-card">
+              <span>夜の体重 kg</span>
+              <input type="number" id="assistant-weight-night" min="20" max="250" step="0.1">
+            </label>
+          </div>
+        </section>
+
+        <section class="assistant-record-section" aria-labelledby="assistant-meals-title">
+          <div class="assistant-record-section-heading">
+            <div>
+              <span>Meals</span>
+              <h3 id="assistant-meals-title">食事</h3>
+            </div>
+            <small>1行に1品：食品名｜量｜kcal｜P｜F｜C</small>
+          </div>
+          <p class="assistant-format-example">例：サーモン丼｜酢飯300g｜820｜38｜22｜111</p>
+          <div class="assistant-meal-grid">
+            <label>
+              <span>朝食</span>
+              <textarea id="assistant-meal-breakfast" rows="3" spellcheck="false" placeholder="朝食なし｜食べていない｜0｜0｜0｜0"></textarea>
+            </label>
+            <label>
+              <span>昼食</span>
+              <textarea id="assistant-meal-lunch" rows="3" spellcheck="false"></textarea>
+            </label>
+            <label>
+              <span>夕食</span>
+              <textarea id="assistant-meal-dinner" rows="3" spellcheck="false"></textarea>
+            </label>
+            <label>
+              <span>間食</span>
+              <textarea id="assistant-meal-snack" rows="3" spellcheck="false"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="assistant-record-section" aria-labelledby="assistant-exercise-title">
+          <div class="assistant-record-section-heading">
+            <div>
+              <span>Exercise</span>
+              <h3 id="assistant-exercise-title">運動</h3>
+            </div>
+            <small>1行に1件：運動名｜量｜単位｜消費kcal</small>
+          </div>
+          <textarea id="assistant-exercise-items" rows="3" spellcheck="false" aria-label="運動一覧" placeholder="ウォーキング｜30｜分｜105"></textarea>
+        </section>
+
+        <div id="assistant-record-summary" class="assistant-record-summary" aria-live="polite">記録日を選ぶと保存済みデータを読み込みます。</div>
+        <button class="primary-button assistant-save-button" type="submit">まとめて保存</button>
+        <p id="assistant-record-feedback" class="save-feedback" role="status" aria-live="polite">保存済みデータを上書きせずに読み込んでから編集できます。</p>
+      </form>
+    </div>
+
     <nav class="mobile-bottom-nav" aria-label="クイック操作">
       <button type="button" data-scroll-target="top">今日</button>
       <button type="button" data-quick-record="food">食事</button>
-      <button class="mobile-record-main" type="button" data-open-record-menu aria-label="新しい記録">＋</button>
+      <button class="mobile-record-main" type="button" data-open-assistant-record aria-label="ChatGPT記録用を開く">＋</button>
       <button type="button" data-scroll-target="unified-chart-mount">推移</button>
       <button type="button" data-open-settings-shortcut>設定</button>
     </nav>
 
     <script src="config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=20260726-assistant-record-v1"></script>
   </body>
 </html>

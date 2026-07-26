@@ -72,6 +72,15 @@ const openFoodModalButtons = document.querySelectorAll("[data-open-food-modal]")
 const openRecordMenuButtons = document.querySelectorAll("[data-open-record-menu]");
 const recordMenuModal = document.querySelector("#record-menu-modal");
 const closeRecordMenuButton = document.querySelector("#close-record-menu");
+const openAssistantRecordButtons = document.querySelectorAll("[data-open-assistant-record]");
+const assistantRecordModal = document.querySelector("#assistant-record-modal");
+const assistantRecordForm = document.querySelector("#assistant-record-form");
+const assistantRecordDate = document.querySelector("#assistant-record-date");
+const closeAssistantRecordButton = document.querySelector("#close-assistant-record");
+const assistantRecordFeedback = document.querySelector("#assistant-record-feedback");
+const assistantRecordSummary = document.querySelector("#assistant-record-summary");
+const assistantSyncStatus = document.querySelector("#assistant-sync-status");
+const assistantPendingSyncCount = document.querySelector("#assistant-pending-sync-count");
 const undoToast = document.querySelector("#undo-toast");
 const undoMessage = document.querySelector("#undo-message");
 const undoDeleteButton = document.querySelector("#undo-delete");
@@ -125,6 +134,7 @@ let fitbitConnected = false;
 [weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
   input.value = isoToday;
 });
+assistantRecordDate.value = isoToday;
 const exerciseModal = createEntryModal(exerciseForm, "exercise-modal", "運動記録を閉じる");
 const foodModal = createEntryModal(foodForm, "food-modal", "食事記録を閉じる");
 setupRecordModalNavigation(exerciseForm, "weight", "運動", "food");
@@ -213,6 +223,11 @@ foodForm.addEventListener("submit", (event) => {
   setSaveFeedback("food", "success", getSaveSuccessMessage("food"));
 });
 
+assistantRecordForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveAssistantRecord();
+});
+
 weightDateInput.addEventListener("change", () => {
   fillWeightFieldsForDate(weightDateInput.value);
 });
@@ -222,6 +237,9 @@ exerciseDateInput.addEventListener("change", () => {
 foodDateInput.addEventListener("change", () => {
   fillFoodFormForDate(foodDateInput.value);
   renderFoodShortcuts();
+});
+assistantRecordDate.addEventListener("change", () => {
+  fillAssistantRecordForDate(assistantRecordDate.value);
 });
 
 copyPreviousMealButton.addEventListener("click", copyPreviousDayFood);
@@ -414,6 +432,12 @@ openFoodModalButtons.forEach((button) => {
 openRecordMenuButtons.forEach((button) => {
   button.addEventListener("click", openRecordMenu);
 });
+openAssistantRecordButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    closeRecordMenu();
+    openAssistantRecord();
+  });
+});
 closeRecordMenuButton.addEventListener("click", closeRecordMenu);
 recordMenuModal.addEventListener("click", (event) => {
   if (event.target === recordMenuModal) closeRecordMenu();
@@ -436,6 +460,10 @@ document.querySelectorAll("[data-record-navigate]").forEach((button) => {
 closeWeightModalButton.addEventListener("click", closeWeightModal);
 weightModal.addEventListener("click", (event) => {
   if (event.target === weightModal) closeWeightModal();
+});
+closeAssistantRecordButton.addEventListener("click", closeAssistantRecord);
+assistantRecordModal.addEventListener("click", (event) => {
+  if (event.target === assistantRecordModal) closeAssistantRecord();
 });
 
 document.addEventListener("click", (event) => {
@@ -514,6 +542,10 @@ settingsScreen.addEventListener("click", (event) => {
   if (event.target === settingsScreen) closeSettings();
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !assistantRecordModal.hidden) {
+    closeAssistantRecord();
+    return;
+  }
   if (event.key === "Escape" && !weightModal.hidden) {
     closeWeightModal();
     return;
@@ -1030,6 +1062,203 @@ function closeRecordMenu() {
   updateModalOpenState();
 }
 
+function openAssistantRecord() {
+  const selectedDate = isoToday;
+  assistantRecordDate.value = selectedDate;
+  fillAssistantRecordForDate(selectedDate);
+  setAssistantRecordFeedback("", "保存済みデータを読み込んでいます。必要な欄だけ編集できます。");
+  assistantRecordModal.hidden = false;
+  document.body.classList.add("modal-open");
+  closeAssistantRecordButton.focus();
+}
+
+function closeAssistantRecord() {
+  assistantRecordModal.hidden = true;
+  updateModalOpenState();
+}
+
+function fillAssistantRecordForDate(date) {
+  const entry = entries.find((item) => item.date === date);
+  document.querySelector("#assistant-weight-morning").value = entry?.weightMorning ?? "";
+  document.querySelector("#assistant-weight-night").value = entry?.weightNight ?? "";
+  const mealItems = normalizeMealItems(entry?.mealItems);
+  Object.keys(mealItems).forEach((meal) => {
+    document.querySelector(`#assistant-meal-${meal}`).value = serializeAssistantMealItems(mealItems[meal]);
+  });
+  document.querySelector("#assistant-exercise-items").value = serializeAssistantExerciseItems(entry?.exerciseItems);
+  renderAssistantRecordSummary(entry, date);
+  setAssistantRecordFeedback(
+    "",
+    entry ? `${formatDateLabel(date)}の保存済みデータを読み込みました。` : `${formatDateLabel(date)}の新しい記録です。`,
+  );
+}
+
+function serializeAssistantMealItems(items) {
+  return items.map((item) => [
+    item.name,
+    item.amount,
+    assistantFieldValue(item.calories),
+    assistantFieldValue(item.protein),
+    assistantFieldValue(item.fat),
+    assistantFieldValue(item.carbs),
+  ].join("｜")).join("\n");
+}
+
+function serializeAssistantExerciseItems(items) {
+  return normalizeExerciseItems(items).map((item) => [
+    item.name,
+    assistantFieldValue(item.amount),
+    getExerciseUnitLabel(item.baseUnit),
+    assistantFieldValue(item.burnCalories),
+  ].join("｜")).join("\n");
+}
+
+function assistantFieldValue(value) {
+  const normalized = numberOrNull(value);
+  return normalized === null ? "" : String(normalized);
+}
+
+function parseAssistantLines(value) {
+  return String(value || "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(/[|｜\t]/u).map((column) => column.trim()));
+}
+
+function parseAssistantNumber(rawValue, label, lineNumber, { required = false, positive = false } = {}) {
+  if (String(rawValue ?? "").trim() === "") {
+    if (required) throw new Error(`${lineNumber}行目の${label}を入力してください。`);
+    return null;
+  }
+  const value = numberOrNull(rawValue);
+  if (value === null || value < 0 || (positive && value <= 0)) {
+    throw new Error(`${lineNumber}行目の${label}は${positive ? "0より大きい" : "0以上の"}数値で入力してください。`);
+  }
+  return value;
+}
+
+function parseAssistantMealItems(value, meal) {
+  return parseAssistantLines(value).map((columns, index) => {
+    const lineNumber = index + 1;
+    const [name, amount = "", caloriesRaw = "", proteinRaw = "", fatRaw = "", carbsRaw = ""] = columns;
+    if (!name) throw new Error(`${getMealName(meal)}の${lineNumber}行目に食品名がありません。`);
+    const protein = parseAssistantNumber(proteinRaw, "P", lineNumber);
+    const fat = parseAssistantNumber(fatRaw, "F", lineNumber);
+    const carbs = parseAssistantNumber(carbsRaw, "C", lineNumber);
+    let calories = parseAssistantNumber(caloriesRaw, "kcal", lineNumber);
+    if (calories === null && [protein, fat, carbs].some((nutrient) => nutrient !== null)) {
+      calories = Math.round((protein || 0) * 4 + (fat || 0) * 9 + (carbs || 0) * 4);
+    }
+    if (calories === null) {
+      throw new Error(`${getMealName(meal)}の${lineNumber}行目はkcalまたはPFCを入力してください。`);
+    }
+    return {
+      id: createId(),
+      name: name.slice(0, 60),
+      amount: amount.slice(0, 30),
+      calories,
+      protein,
+      fat,
+      carbs,
+    };
+  });
+}
+
+function parseAssistantExerciseItems(value) {
+  return normalizeExerciseItems(parseAssistantLines(value).map((columns, index) => {
+    const lineNumber = index + 1;
+    const [name, amountRaw = "", unitRaw = "分", caloriesRaw = ""] = columns;
+    if (!name) throw new Error(`運動の${lineNumber}行目に運動名がありません。`);
+    const amount = parseAssistantNumber(amountRaw, "量", lineNumber, { required: true, positive: true });
+    const unit = unitRaw.toLowerCase();
+    const baseUnit = unit.includes("回") || unit.includes("rep") ? "rep" : "minute";
+    if (unit && !["分", "minute", "minutes", "min", "回", "rep", "reps"].some((label) => unit.includes(label))) {
+      throw new Error(`運動の${lineNumber}行目の単位は「分」か「回」で入力してください。`);
+    }
+    const burnCalories = parseAssistantNumber(caloriesRaw, "消費kcal", lineNumber);
+    return {
+      id: createId(),
+      name: name.slice(0, 60),
+      baseUnit,
+      baseAmount: amount,
+      multiplier: 1,
+      amount,
+      caloriesPerBase: burnCalories,
+      burnCalories,
+    };
+  }));
+}
+
+function saveAssistantRecord() {
+  const date = assistantRecordDate.value;
+  if (!date) {
+    setAssistantRecordFeedback("error", "記録日を選択してください。");
+    return;
+  }
+  try {
+    const mealItems = createEmptyMealItems();
+    Object.keys(mealItems).forEach((meal) => {
+      mealItems[meal] = parseAssistantMealItems(
+        document.querySelector(`#assistant-meal-${meal}`).value,
+        meal,
+      );
+    });
+    const exerciseItems = parseAssistantExerciseItems(document.querySelector("#assistant-exercise-items").value);
+    const entry = getOrCreateEntry(date);
+    entry.weightMorning = numberOrNull(document.querySelector("#assistant-weight-morning").value);
+    entry.weightNight = numberOrNull(document.querySelector("#assistant-weight-night").value);
+    entry.weight = entry.weightNight ?? entry.weightMorning ?? null;
+    entry.mealItems = normalizeMealItems(mealItems);
+    entry.mealCalories = Object.fromEntries(Object.entries(entry.mealItems).map(([meal, items]) => [
+      meal,
+      items.length ? Math.round(items.reduce((sum, item) => sum + (item.calories || 0), 0)) : null,
+    ]));
+    entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
+    entry.meals = getMealsFromCalories(entry.mealCalories);
+    entry.meal = deriveMealScore(entry.meals, []);
+    entry.exerciseItems = exerciseItems;
+    entry.burnCalories = sumExerciseItems(exerciseItems, "burnCalories");
+    entry.exerciseMinutes = sumExerciseItems(exerciseItems, "minutes");
+    entry.exerciseName = exerciseItems[0]?.name || "";
+    entry.exerciseType = "";
+    entry.habits = Array.isArray(entry.habits) ? entry.habits : [];
+    commitEntry(entry);
+    saveEntries();
+    render();
+    renderAssistantRecordSummary(entry, date);
+    setAssistantRecordFeedback("success", `${formatDateLabel(date)}の体重・食事・運動をまとめて保存しました。`);
+  } catch (error) {
+    setAssistantRecordFeedback("error", error.message || "入力形式を確認してください。");
+  }
+}
+
+function renderAssistantRecordSummary(entry, date) {
+  if (!entry) {
+    assistantRecordSummary.textContent = `${formatDateLabel(date)}：保存済みの記録はありません。`;
+    return;
+  }
+  const mealItems = Object.values(normalizeMealItems(entry.mealItems)).flat();
+  const exerciseItems = normalizeExerciseItems(entry.exerciseItems);
+  const weights = [
+    numberOrNull(entry.weightMorning) === null ? "" : `朝${Number(entry.weightMorning).toFixed(1)}kg`,
+    numberOrNull(entry.weightNight) === null ? "" : `夜${Number(entry.weightNight).toFixed(1)}kg`,
+  ].filter(Boolean).join("・") || "体重なし";
+  const intake = numberOrNull(entry.intakeCalories);
+  const burn = numberOrNull(entry.burnCalories);
+  assistantRecordSummary.textContent = [
+    formatDateLabel(date),
+    weights,
+    `食事${mealItems.length}品・${intake === null ? "--" : Math.round(intake)}kcal`,
+    `運動${exerciseItems.length}件・${burn === null ? "--" : Math.round(burn)}kcal`,
+  ].join(" / ");
+}
+
+function setAssistantRecordFeedback(type, message) {
+  assistantRecordFeedback.textContent = message;
+  assistantRecordFeedback.className = `save-feedback${type ? ` is-${type}` : ""}`;
+}
+
 function createEntryModal(entryForm, id, closeLabel) {
   const modal = document.createElement("div");
   modal.id = id;
@@ -1107,7 +1336,7 @@ function closeEntryModal(modal) {
 }
 
 function updateModalOpenState() {
-  const hasOpenModal = [recordMenuModal, weightModal, exerciseModal, foodModal, settingsScreen]
+  const hasOpenModal = [recordMenuModal, assistantRecordModal, weightModal, exerciseModal, foodModal, settingsScreen]
     .some((modal) => modal && !modal.hidden);
   document.body.classList.toggle("modal-open", hasOpenModal);
 }
@@ -1679,7 +1908,10 @@ function getResendErrorMessage(error) {
 
 function setSyncState(status, message) {
   if (syncStatus) syncStatus.textContent = status;
-  if (pendingSyncCount) pendingSyncCount.textContent = `${dirtyEntryDates.size + (settingsDirty ? 1 : 0)}件`;
+  if (assistantSyncStatus) assistantSyncStatus.textContent = status;
+  const pendingCountLabel = `${dirtyEntryDates.size + (settingsDirty ? 1 : 0)}件`;
+  if (pendingSyncCount) pendingSyncCount.textContent = pendingCountLabel;
+  if (assistantPendingSyncCount) assistantPendingSyncCount.textContent = pendingCountLabel;
   if (message && cloudFeedback) setCloudFeedback("error", message);
 }
 

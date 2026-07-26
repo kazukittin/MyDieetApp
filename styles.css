@@ -296,6 +296,13 @@ button {
   background: var(--green-soft);
 }
 
+.record-choice-grid .assistant-record-choice {
+  grid-column: 1 / -1;
+  min-height: 104px;
+  border-color: var(--green);
+  background: linear-gradient(135deg, var(--green-soft), var(--panel));
+}
+
 .record-choice-grid strong {
   font-size: 1.2rem;
 }
@@ -353,6 +360,136 @@ button {
 
 .modal-date-field input {
   width: 100%;
+}
+
+.assistant-record-card {
+  width: min(960px, 100%);
+}
+
+.assistant-record-card .settings-header {
+  align-items: start;
+}
+
+.assistant-record-card .settings-header p:last-child {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.assistant-record-date-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.55fr);
+  gap: 14px;
+  align-items: stretch;
+  margin: 18px 0;
+}
+
+.assistant-record-date-bar .modal-date-field {
+  margin: 0;
+}
+
+.assistant-sync-card {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  padding: 12px 14px;
+}
+
+.assistant-sync-card > span,
+.assistant-sync-card small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.assistant-sync-card strong {
+  color: var(--green);
+}
+
+.assistant-record-section {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+}
+
+.assistant-record-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+}
+
+.assistant-record-section-heading span {
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.assistant-record-section-heading h3 {
+  margin: 2px 0 0;
+  font-size: 1.05rem;
+}
+
+.assistant-record-section-heading small,
+.assistant-format-example {
+  color: var(--muted);
+}
+
+.assistant-format-example {
+  margin: -4px 0 0;
+  font-size: 0.84rem;
+}
+
+.assistant-meal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.assistant-meal-grid label,
+.assistant-record-section > textarea {
+  display: grid;
+  gap: 7px;
+}
+
+.assistant-meal-grid label > span {
+  font-weight: 800;
+}
+
+.assistant-record-card textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.5;
+  padding: 11px 12px;
+}
+
+.assistant-record-card textarea:focus {
+  border-color: var(--green);
+  outline: 3px solid color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+.assistant-record-summary {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 12px 14px;
+}
+
+.assistant-save-button {
+  margin-top: 4px;
 }
 
 .app-page {
@@ -2574,6 +2711,17 @@ legend {
 
   .record-choice-grid {
     grid-template-columns: 1fr;
+  }
+
+  .assistant-record-date-bar,
+  .assistant-meal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-record-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .summary-grid {
