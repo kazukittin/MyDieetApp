@@ -1224,6 +1224,15 @@ h2 {
   color: var(--coral);
 }
 
+.sync-source-label {
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 6px 9px;
+}
+
 .undo-toast {
   position: fixed;
   right: 20px;

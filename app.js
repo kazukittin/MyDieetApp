@@ -1,5 +1,10 @@
 const storageKey = "my-diet-notebook:v2";
 const recordDayBoundaryHour = 3;
+const stepsPerWalkingMinute = 100;
+const walkingStrideHeightRatio = 0.415;
+const walkingCaloriesPerKgKm = 0.5;
+const fallbackWalkingHeightCm = 165;
+const fallbackWalkingWeightKg = 60;
 const today = getRecordDayDate(new Date());
 const isoToday = toIsoDate(today);
 
@@ -1245,12 +1250,15 @@ function renderAssistantRecordSummary(entry, date) {
     numberOrNull(entry.weightNight) === null ? "" : `夜${Number(entry.weightNight).toFixed(1)}kg`,
   ].filter(Boolean).join("・") || "体重なし";
   const intake = numberOrNull(entry.intakeCalories);
-  const burn = numberOrNull(entry.burnCalories);
+  const fitbit = getFitbitExerciseEstimate(entry);
+  const burn = getExerciseBurnTotal(entry);
+  const manualExerciseCount = exerciseItems.length || (hasManualExerciseEntry(entry) ? 1 : 0);
+  const exerciseCount = manualExerciseCount + (fitbit ? 1 : 0);
   assistantRecordSummary.textContent = [
     formatDateLabel(date),
     weights,
     `食事${mealItems.length}品・${intake === null ? "--" : Math.round(intake)}kcal`,
-    `運動${exerciseItems.length}件・${burn === null ? "--" : Math.round(burn)}kcal`,
+    `運動${exerciseCount}件・${burn === null ? "--" : Math.round(burn)}kcal${fitbit ? "（歩数換算を含む）" : ""}`,
   ].join(" / ");
 }
 
@@ -2011,7 +2019,7 @@ function renderFitbitSteps(entry) {
     : `${Math.round(steps).toLocaleString("ja-JP")} 歩`;
   document.querySelector("#fitbit-steps-detail").textContent = steps === null
     ? "Google Healthを連携すると表示"
-    : "Google Healthの日別合計";
+    : "Google Healthの日別合計・運動に換算";
 }
 
 function renderWeeklyReport(weekEntries) {
@@ -2043,7 +2051,7 @@ function setStatusPill(selector, label, isDone, detail) {
 
 function renderCalorieDashboard(entry) {
   const intake = entry?.intakeCalories ?? null;
-  const burn = entry?.burnCalories ?? null;
+  const burn = getExerciseBurnTotal(entry);
   const weight = getPrimaryWeight(entry);
 
   document.querySelector("#intake-calorie-label").textContent = intake === null ? "-- kcal" : `${Math.round(intake)} kcal`;
@@ -2069,7 +2077,7 @@ function renderCalorieComboChart() {
   const rangePoints = entries
     .filter((item) => (
       (balanceSeries.has("intake") && numberOrNull(item.intakeCalories) !== null)
-      || (balanceSeries.has("burn") && numberOrNull(item.burnCalories) !== null)
+      || (balanceSeries.has("burn") && getExerciseBurnTotal(item) !== null)
       || (balanceSeries.has("weight") && hasWeightEntry(item))
     ))
     .filter((item) => isWithinRange(item.date, comboChartRangeDays))
@@ -2092,7 +2100,7 @@ function renderCalorieComboChart() {
   const pad = { top: 24, right: 58, bottom: 42, left: 58 };
   const calorieValues = points.flatMap((point) => [
     balanceSeries.has("intake") ? point.intakeCalories : null,
-    balanceSeries.has("burn") ? point.burnCalories : null,
+    balanceSeries.has("burn") ? getExerciseBurnTotal(point) : null,
   ]).filter((value) => value !== null);
   const weightValues = balanceSeries.has("weight") ? points.map(getPrimaryWeight).filter((value) => value !== null) : [];
   const max = calorieValues.length ? Math.max(500, Math.ceil(Math.max(...calorieValues) / 250) * 250) : 500;
@@ -2129,7 +2137,7 @@ function renderCalorieComboChart() {
     .filter(Boolean)
     .join(" ");
   const bars = balanceSeries.has("burn") ? points.map((point, index) => {
-    const value = point.burnCalories || 0;
+    const value = getExerciseBurnTotal(point) || 0;
     const barHeight = Math.max(0, pad.top + innerHeight - y(value));
     const x = xCenter(index) - barWidth / 2;
     return `<rect class="calorie-burn-bar" x="${x.toFixed(1)}" y="${y(value).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" rx="6"><title>${formatDateLabel(point.date)} 消費 ${Math.round(value)}kcal</title></rect>`;
@@ -2315,11 +2323,11 @@ function renderWeightPageSummary() {
 function renderExercisePage() {
   const weekEntries = getRecentEntries(7);
   const exerciseEntries = weekEntries.filter(hasExerciseEntry);
-  const totalMinutes = exerciseEntries.reduce((sum, entry) => sum + (entry.exerciseMinutes || 0), 0);
+  const totalMinutes = exerciseEntries.reduce((sum, entry) => sum + (getExerciseMinutesTotal(entry) || 0), 0);
   const totalReps = exerciseEntries.reduce((sum, entry) => (
     sum + (sumExerciseItems(normalizeExerciseItems(entry.exerciseItems), "reps") || 0)
   ), 0);
-  const totalBurn = exerciseEntries.reduce((sum, entry) => sum + (entry.burnCalories || 0), 0);
+  const totalBurn = exerciseEntries.reduce((sum, entry) => sum + (getExerciseBurnTotal(entry) || 0), 0);
   const todayEntry = entries.find((entry) => entry.date === isoToday);
 
   renderExercisePresets();
@@ -2671,15 +2679,17 @@ function renderExerciseHistory() {
         </div>
         <div>${getExerciseDetailLabel(entry)}</div>
         <div class="history-actions">
-          <button type="button" data-edit-entry="exercise" data-entry-date="${entry.date}">編集</button>
-          <button type="button" data-delete-entry="exercise" data-entry-date="${entry.date}">削除</button>
+          ${hasManualExerciseEntry(entry) ? `
+            <button type="button" data-edit-entry="exercise" data-entry-date="${entry.date}">手入力を編集</button>
+            <button type="button" data-delete-entry="exercise" data-entry-date="${entry.date}">手入力を削除</button>
+          ` : '<span class="sync-source-label">Google Healthの歩数</span>'}
         </div>
       </article>
     `)
     .join("");
 }
 
-function hasExerciseEntry(entry) {
+function hasManualExerciseEntry(entry) {
   return Boolean(entry && (
     normalizeExerciseItems(entry.exerciseItems).length
     ||
@@ -2690,19 +2700,79 @@ function hasExerciseEntry(entry) {
   ));
 }
 
+function getFitbitExerciseEstimate(entry) {
+  const steps = numberOrNull(entry?.fitbitSteps);
+  if (steps === null || steps <= 0) return null;
+  const profileHeight = numberOrNull(profile.height);
+  const heightCm = profileHeight !== null && profileHeight > 0 ? profileHeight : fallbackWalkingHeightCm;
+  const weightKg = getExerciseEstimateWeight(entry);
+  const strideMeters = (heightCm * walkingStrideHeightRatio) / 100;
+  const distanceKm = (steps * strideMeters) / 1000;
+  return {
+    steps: Math.round(steps),
+    minutes: Math.max(1, Math.round(steps / stepsPerWalkingMinute)),
+    distanceKm: Math.round(distanceKm * 100) / 100,
+    burnCalories: Math.max(1, Math.round(distanceKm * weightKg * walkingCaloriesPerKgKm)),
+  };
+}
+
+function getExerciseEstimateWeight(entry) {
+  const getPositiveWeight = (item) => {
+    const weight = getPrimaryWeight(item);
+    return weight !== null && weight > 0 ? weight : null;
+  };
+  const sameDayWeight = getPositiveWeight(entry);
+  if (sameDayWeight !== null) return sameDayWeight;
+  const datedWeight = entries.find((item) => item.date <= entry.date && getPositiveWeight(item) !== null);
+  const latestWeight = entries.find((item) => getPositiveWeight(item) !== null);
+  const profileWeight = numberOrNull(profile.startWeight);
+  return getPositiveWeight(datedWeight)
+    ?? getPositiveWeight(latestWeight)
+    ?? (profileWeight !== null && profileWeight > 0 ? profileWeight : null)
+    ?? fallbackWalkingWeightKg;
+}
+
+function getExerciseMinutesTotal(entry) {
+  const values = [
+    numberOrNull(entry?.exerciseMinutes),
+    getFitbitExerciseEstimate(entry)?.minutes ?? null,
+  ].filter((value) => value !== null);
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0)) : null;
+}
+
+function getExerciseBurnTotal(entry) {
+  const values = [
+    numberOrNull(entry?.burnCalories),
+    getFitbitExerciseEstimate(entry)?.burnCalories ?? null,
+  ].filter((value) => value !== null);
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0)) : null;
+}
+
+function hasExerciseEntry(entry) {
+  return hasManualExerciseEntry(entry) || getFitbitExerciseEstimate(entry) !== null;
+}
+
 function getExerciseEntryName(entry) {
   const firstItem = normalizeExerciseItems(entry?.exerciseItems)[0];
-  return firstItem?.name || entry?.exerciseName || (entry?.exerciseType ? getExerciseTypeLabel(entry.exerciseType) : "入力済み");
+  const manualName = firstItem?.name || entry?.exerciseName || (entry?.exerciseType ? getExerciseTypeLabel(entry.exerciseType) : "");
+  const fitbit = getFitbitExerciseEstimate(entry);
+  if (manualName && fitbit) return `${manualName}＋歩数`;
+  return manualName || (fitbit ? "歩数ウォーキング" : "入力済み");
 }
 
 function getExerciseDetailLabel(entry) {
-  const burn = entry.burnCalories === null || entry.burnCalories === undefined ? "--kcal" : `${Math.round(entry.burnCalories)}kcal`;
   const items = normalizeExerciseItems(entry.exerciseItems);
-  if (items.length) {
-    return `${items.map((item) => `${escapeHtml(item.name)} ${item.amount}${getExerciseUnitLabel(item.baseUnit)}`).join("・")} / ${burn}`;
+  const fitbit = getFitbitExerciseEstimate(entry);
+  const details = items.map((item) => `${escapeHtml(item.name)} ${item.amount}${getExerciseUnitLabel(item.baseUnit)}`);
+  if (!items.length && hasManualExerciseEntry(entry)) {
+    const manualMinutes = numberOrNull(entry.exerciseMinutes);
+    if (manualMinutes !== null) details.push(`${Math.round(manualMinutes)}分`);
   }
-  const minutes = entry.exerciseMinutes === null || entry.exerciseMinutes === undefined ? "--分" : `${Math.round(entry.exerciseMinutes)}分`;
-  return `${minutes} / ${burn}`;
+  if (fitbit) {
+    details.push(`${fitbit.steps.toLocaleString("ja-JP")}歩（約${fitbit.minutes}分）`);
+  }
+  const burn = getExerciseBurnTotal(entry);
+  return `${details.join("・") || "運動入力済み"} / ${burn === null ? "--kcal" : `約${burn}kcal`}`;
 }
 
 function getExerciseTypeLabel(value) {
@@ -3341,7 +3411,7 @@ function getMealLogLabel(meals) {
 
 function getCalorieLabel(entry) {
   const intake = entry.intakeCalories ?? null;
-  const burn = entry.burnCalories ?? null;
+  const burn = getExerciseBurnTotal(entry);
   if (intake === null && burn === null) return "カロリー未入力";
   const intakeText = intake === null ? "--" : Math.round(intake);
   const burnText = burn === null ? "--" : Math.round(burn);

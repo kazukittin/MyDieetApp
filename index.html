@@ -8,7 +8,7 @@
     <title>My Diet Notebook</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css?v=20260726-assistant-record-v1">
+    <link rel="stylesheet" href="styles.css?v=20260726-fitbit-exercise-v1">
   </head>
   <body>
     <div id="auth-screen" class="auth-screen">
@@ -148,7 +148,7 @@
               <div class="setting-action-card"><div><strong>記録リマインダー</strong><p>指定時刻に、この端末で記録を促します。</p></div><label><span>時刻</span><input id="reminder-time" type="time" value="21:00"></label><button id="enable-reminder" class="ghost-button" type="button">通知を有効にする</button></div>
               <div class="setting-action-card"><div><strong>バックアップ</strong><p>プロフィール、記録、プリセットをJSONで保存・復元します。</p></div><div class="account-secondary-actions"><button id="export-backup" class="ghost-button" type="button">書き出す</button><button id="import-backup" class="ghost-button" type="button">復元する</button><input id="import-backup-file" type="file" accept="application/json,.json" hidden></div></div>
               <div class="setting-action-card fitbit-setting-card">
-                <div><strong>Google Health歩数連携</strong><p id="fitbit-status">接続状態を確認しています。</p><small id="fitbit-last-sync"></small></div>
+                <div><strong>Google Health歩数連携</strong><p id="fitbit-status">接続状態を確認しています。</p><small>歩数を推定ウォーキング時間・消費カロリーとして運動に合算します。</small><small id="fitbit-last-sync"></small></div>
                 <div class="account-secondary-actions">
                   <button id="fitbit-connect" class="primary-button" type="button">Google Healthを連携</button>
                   <button id="fitbit-sync" class="ghost-button" type="button" hidden>歩数を同期</button>
@@ -922,6 +922,6 @@
 
     <script src="config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=20260726-assistant-record-v1"></script>
+    <script src="app.js?v=20260726-fitbit-exercise-v1"></script>
   </body>
 </html>
