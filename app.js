@@ -1709,7 +1709,12 @@ async function syncFitbitSteps(days = 30) {
     updateFitbitControls(true, syncedAt);
     fitbitStatus.textContent = `${data.steps?.length || 0}日分の歩数を同期しました。`;
   } catch (error) {
-    fitbitStatus.textContent = error.message;
+    if (error.message.includes("認証期限が切れました")) {
+      updateFitbitControls(false);
+      fitbitStatus.textContent = `${error.message}「Google Healthを連携」から再接続できます。`;
+    } else {
+      fitbitStatus.textContent = error.message;
+    }
   } finally {
     fitbitSyncButton.disabled = false;
   }

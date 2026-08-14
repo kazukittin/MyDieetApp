@@ -11,11 +11,23 @@ async function validAccessToken(connection: Record<string, unknown>) {
   if (new Date(String(connection.expires_at)).getTime() > Date.now() + 60_000) {
     return String(connection.access_token);
   }
-  const token = await exchangeGoogleHealthToken(new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: String(connection.refresh_token),
-  }));
   const admin = adminClient();
+  let token;
+  try {
+    token = await exchangeGoogleHealthToken(new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: String(connection.refresh_token),
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("invalid_grant")) {
+      // An expired/revoked refresh token cannot recover. Remove the stale
+      // connection so the app can immediately offer OAuth reconnection.
+      await admin.from("google_health_connections").delete().eq("user_id", connection.user_id);
+      throw new Error("Google Healthの認証期限が切れました。もう一度連携してください。");
+    }
+    throw error;
+  }
   const { error } = await admin.from("google_health_connections").update({
     access_token: token.access_token,
     refresh_token: token.refresh_token || connection.refresh_token,
@@ -58,18 +70,21 @@ Deno.serve(async (req) => {
     if (action !== "sync") return json({ error: "未対応の操作です。" }, 400);
     if (!connection) return json({ error: "Fitbitが未連携です。" }, 409);
 
-    const days = Math.min(100, Math.max(1, Number(body.days || 30)));
+    // Google Health dailyRollUp accepts at most 90 days and requires a
+    // closed-open civil-time range aligned to whole-day windows.
+    const days = Math.min(90, Math.max(1, Number(body.days || 30)));
     const requestedEndDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.endDate || ""))
       ? String(body.endDate)
       : new Date().toISOString().slice(0, 10);
     const end = new Date(`${requestedEndDate}T00:00:00Z`);
     const start = new Date(end);
     start.setDate(start.getDate() - days + 1);
-    const iso = (date: Date) => date.toISOString().slice(0, 10);
+    const endExclusive = new Date(end);
+    endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
     const token = await validAccessToken(connection);
-    const civil = (date: Date, endOfDay = false) => ({
+    const civil = (date: Date) => ({
       date: { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() },
-      time: endOfDay ? { hours: 23, minutes: 59, seconds: 59 } : {},
+      time: { hours: 0, minutes: 0, seconds: 0, nanos: 0 },
     });
     const response = await fetch("https://health.googleapis.com/v4/users/me/dataTypes/steps/dataPoints:dailyRollUp", {
       method: "POST",
@@ -79,7 +94,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        range: { start: civil(start), end: civil(end, true) },
+        range: { start: civil(start), end: civil(endExclusive) },
         windowSizeDays: 1,
       }),
     });

@@ -68,6 +68,8 @@ Google CloudでGoogle Health APIを有効にし、OAuthクライアントを1件
 
 Supabase CLIでGoogleのClient ID、Client Secret、アプリの公開URLをSecretsへ登録します。Client Secretは`config.js`やGitHubへ保存しないでください。
 
+OAuth同意画面が **Testing** のままだと、Google Healthのようなユーザーデータ用スコープを含む更新トークンは7日で失効します。継続利用する公開環境では、Google Cloud Consoleの **Google Auth Platform → Audience** で公開ステータスを **In production** にし、必要に応じてGoogleの検証手続きを完了してください。Testingのまま運用する場合は、7日ごとに再連携が必要です。
+
 ```powershell
 supabase secrets set GOOGLE_HEALTH_CLIENT_ID="YOUR_CLIENT_ID"
 supabase secrets set GOOGLE_HEALTH_CLIENT_SECRET="YOUR_CLIENT_SECRET"
