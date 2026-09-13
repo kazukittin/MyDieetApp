@@ -127,6 +127,79 @@ let lastDeletion = null;
 let undoTimer = null;
 const dirtyEntryDates = new Set();
 let settingsDirty = false;
+const outboxStorageKey = "my-diet-notebook:outbox:v1";
+let syncQueue = Promise.resolve();
+let syncError = "";
+let syncBusy = false;
+let cloudVerified = false;
+let localSaveError = false;
+
+function sameSavedValue(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && sameSavedValue(a[key], b[key]));
+}
+
+function persistOutbox() {
+  if (!activeUser) return;
+  try {
+    localStorage.setItem(getUserStorageKey(outboxStorageKey), JSON.stringify({
+      entries: entries.filter((entry) => dirtyEntryDates.has(entry.date)),
+      deletedEntries: Object.fromEntries(Object.entries(deletedEntries).filter(([date]) => dirtyEntryDates.has(date))),
+      settings: settingsDirty ? { profile, exercisePresets, foodPresets, appliedPresetSeedVersion, settingsUpdatedAt } : null,
+    }));
+    localSaveError = false;
+  } catch {
+    localSaveError = true;
+    setSyncState();
+    throw new Error("端末に保存できませんでした。入力画面を閉じず、空き容量やブラウザーの保存設定を確認して再度保存してください。");
+  }
+}
+
+function restoreOutbox() {
+  const raw = localStorage.getItem(getUserStorageKey(outboxStorageKey));
+  if (!raw) return;
+  const saved = JSON.parse(raw);
+  for (const entry of saved.entries || []) {
+    entries = entries.filter((item) => item.date !== entry.date);
+    entries.push(entry);
+    delete deletedEntries[entry.date];
+    dirtyEntryDates.add(entry.date);
+  }
+  for (const [date, timestamp] of Object.entries(saved.deletedEntries || {})) {
+    entries = entries.filter((item) => item.date !== date);
+    deletedEntries[date] = timestamp;
+    dirtyEntryDates.add(date);
+  }
+  if (saved.settings) {
+    ({ profile, exercisePresets, foodPresets, appliedPresetSeedVersion, settingsUpdatedAt } = saved.settings);
+    settingsDirty = true;
+  }
+  entries.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function queueSync(action) {
+  const userId = activeUser?.id;
+  const task = syncQueue.catch(() => {}).then(async () => {
+    if (!userId || activeUser?.id !== userId) return;
+    if (!navigator.onLine) { setSyncState(); return; }
+    syncBusy = true;
+    syncError = "";
+    setSyncState();
+    try {
+      await action(userId);
+      if (activeUser?.id === userId) cloudVerified = true;
+    } catch (error) {
+      if (activeUser?.id === userId) syncError = getCloudErrorMessage(error);
+      throw error;
+    } finally {
+      if (activeUser?.id === userId) { syncBusy = false; setSyncState(); }
+    }
+  });
+  syncQueue = task;
+  return task;
+}
 let editingExercisePresetId = null;
 let selectedExercisePresetId = null;
 let editingFoodPresetId = null;
@@ -154,7 +227,7 @@ registerServiceWorker();
 restoreReminderSettings();
 
 window.addEventListener("focus", () => {
-  if (activeUser) syncFromCloud();
+  if (activeUser) syncFromCloud().catch(() => {});
 });
 window.addEventListener("online", () => {
   setSyncState("再接続・同期中");
@@ -167,7 +240,7 @@ window.addEventListener("beforeinstallprompt", (event) => {
   document.querySelector("#install-app").hidden = false;
 });
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && activeUser) syncFromCloud();
+  if (!document.hidden && activeUser) syncFromCloud().catch(() => {});
 });
 
 weightForm.addEventListener("submit", (event) => {
@@ -651,7 +724,9 @@ function loadEntries() {
 
 function saveEntries() {
   if (!activeUser) return;
+  persistOutbox();
   localStorage.setItem(getUserStorageKey(storageKey), JSON.stringify(entries));
+  setSyncState();
   if (activeUser) {
     pushEntriesToCloud().catch((error) => {
       setSyncState("同期エラー", getCloudErrorMessage(error));
@@ -696,6 +771,7 @@ function markEntryDeleted(date) {
   deletedEntries[date] = new Date().toISOString();
   dirtyEntryDates.add(date);
   saveDeletedEntries();
+  persistOutbox();
 }
 
 function loadSettingsUpdatedAt() {
@@ -703,9 +779,10 @@ function loadSettingsUpdatedAt() {
 }
 
 function touchSettings() {
-  settingsUpdatedAt = new Date().toISOString();
+  settingsUpdatedAt = new Date(Math.max(Date.now(), new Date(settingsUpdatedAt).getTime() + 1)).toISOString();
   settingsDirty = true;
   localStorage.setItem(getUserStorageKey(settingsUpdatedStorageKey), settingsUpdatedAt);
+  persistOutbox();
 }
 
 function getOrCreateEntry(date) {
@@ -1196,6 +1273,7 @@ function parseAssistantExerciseItems(value) {
 }
 
 function saveAssistantRecord() {
+  if (!activeUser) { setAssistantRecordFeedback("error", "ログインしてから保存してください。"); return; }
   const date = assistantRecordDate.value;
   if (!date) {
     setAssistantRecordFeedback("error", "記録日を選択してください。");
@@ -1232,7 +1310,7 @@ function saveAssistantRecord() {
     saveEntries();
     render();
     renderAssistantRecordSummary(entry, date);
-    setAssistantRecordFeedback("success", `${formatDateLabel(date)}の体重・食事・運動をまとめて保存しました。`);
+    setAssistantRecordFeedback("success", `${formatDateLabel(date)}の体重・食事・運動を端末に保存しました。クラウドへの送信状況は上の表示で確認できます。`);
   } catch (error) {
     setAssistantRecordFeedback("error", error.message || "入力形式を確認してください。");
   }
@@ -1452,7 +1530,9 @@ function mergeEntries(localEntries, serverEntries) {
   return Array.from(byDate.values());
 }
 
-async function syncFromCloud() {
+function syncFromCloud() { return queueSync(syncFromCloudNow); }
+
+async function syncFromCloudNow(userId) {
   if (!activeUser || !supabaseClient) return;
 
   try {
@@ -1468,6 +1548,7 @@ async function syncFromCloud() {
         .eq("user_id", activeUser.id)
         .maybeSingle(),
     ]);
+    if (activeUser?.id !== userId) return;
     if (entryResult.error) throw entryResult.error;
     if (settingsResult.error) throw settingsResult.error;
 
@@ -1475,6 +1556,7 @@ async function syncFromCloud() {
     let cloudSettings = settingsResult.data;
     if (!cloudRows.length && !cloudSettings) {
       const legacyData = await fetchLegacyCloudData();
+      if (activeUser?.id !== userId) return;
       if (legacyData) {
         const legacyEntries = Array.isArray(legacyData) ? legacyData : legacyData.entries;
         entries = mergeEntries(entries, Array.isArray(legacyEntries) ? legacyEntries : []);
@@ -1495,7 +1577,7 @@ async function syncFromCloud() {
       settingsDirty = true;
     } else {
       mergeCloudEntryRows(cloudRows);
-      if (cloudSettings?.payload && new Date(cloudSettings.updated_at) >= new Date(settingsUpdatedAt)) {
+      if (!settingsDirty && cloudSettings?.payload && new Date(cloudSettings.updated_at) >= new Date(settingsUpdatedAt)) {
         profile = cloudSettings.payload.profile || {};
         exercisePresets = Array.isArray(cloudSettings.payload.exercisePresets)
           ? normalizeExercisePresetList(cloudSettings.payload.exercisePresets)
@@ -1515,6 +1597,7 @@ async function syncFromCloud() {
     ensureInitialPresets();
     purgeLegacySampleData();
     entries.sort((a, b) => b.date.localeCompare(a.date));
+    persistOutbox();
     localStorage.setItem(getUserStorageKey(storageKey), JSON.stringify(entries));
     saveDeletedEntries();
     saveProfileToDevice();
@@ -1522,10 +1605,11 @@ async function syncFromCloud() {
     saveFoodPresets();
     savePresetSeedVersion();
     localStorage.setItem(getUserStorageKey(settingsUpdatedStorageKey), settingsUpdatedAt);
-    await pushEntriesToCloud();
+    await pushEntriesToCloudNow(userId);
+    if (activeUser?.id !== userId) return;
     setSyncState("同期済み");
     fillProfileForm();
-    fillAllFormsForDate(isoToday);
+    // Background sync must not replace unsaved form input.
     showOnboardingIfNeeded();
     render();
   } catch (error) {
@@ -1536,16 +1620,19 @@ async function syncFromCloud() {
   }
 }
 
-async function pushEntriesToCloud() {
+function pushEntriesToCloud() { return queueSync(pushEntriesToCloudNow); }
+
+async function pushEntriesToCloudNow(userId) {
   if (!activeUser || !supabaseClient) return;
 
+  persistOutbox();
   const rows = Array.from(dirtyEntryDates).map((date) => {
     const entry = entries.find((item) => item.date === date);
     if (entry) {
       return {
         user_id: activeUser.id,
         entry_date: date,
-        payload: entry,
+        payload: JSON.parse(JSON.stringify(entry)),
         updated_at: entry.updatedAt || new Date().toISOString(),
         deleted_at: null,
       };
@@ -1561,23 +1648,46 @@ async function pushEntriesToCloud() {
   });
 
   if (rows.length) {
-    const { error: entryError } = await supabaseClient
+    const { data: savedRows, error: entryError } = await supabaseClient
       .from(entriesCloudTable)
-      .upsert(rows, { onConflict: "user_id,entry_date" });
+      .upsert(rows, { onConflict: "user_id,entry_date" })
+      .select("entry_date,payload,updated_at,deleted_at");
     if (entryError) throw entryError;
-    rows.forEach((row) => dirtyEntryDates.delete(row.entry_date));
+    if (activeUser?.id !== userId) return;
+    if (!rows.every((row) => savedRows?.some((saved) =>
+      saved.entry_date === row.entry_date
+      && new Date(saved.updated_at).getTime() === new Date(row.updated_at).getTime()
+      && sameSavedValue(saved.payload, row.payload)
+      && (saved.deleted_at ? new Date(saved.deleted_at).getTime() : null) === (row.deleted_at ? new Date(row.deleted_at).getTime() : null)))) {
+      throw new Error("別の端末の新しい記録と競合しています。この端末の記録は保持しています。バックアップを書き出して内容を確認してください。");
+    }
+    rows.forEach((row) => {
+      const current = entries.find((entry) => entry.date === row.entry_date);
+      const unchanged = row.deleted_at
+        ? !current && deletedEntries[row.entry_date] === row.deleted_at
+        : current && JSON.stringify(current) === JSON.stringify(row.payload);
+      if (unchanged) dirtyEntryDates.delete(row.entry_date);
+    });
+    persistOutbox();
   }
 
   if (settingsDirty) {
-    const { error: settingsError } = await supabaseClient
+    const sentSettingsVersion = settingsUpdatedAt;
+    const sentSettings = JSON.parse(JSON.stringify({ profile, exercisePresets, foodPresets, presetSeedVersion: appliedPresetSeedVersion }));
+    const { data: savedSettings, error: settingsError } = await supabaseClient
       .from(settingsCloudTable)
       .upsert({
         user_id: activeUser.id,
-        payload: { profile, exercisePresets, foodPresets, presetSeedVersion: appliedPresetSeedVersion },
+        payload: sentSettings,
         updated_at: settingsUpdatedAt,
-      }, { onConflict: "user_id" });
+      }, { onConflict: "user_id" }).select("payload,updated_at").single();
     if (settingsError) throw settingsError;
-    settingsDirty = false;
+    if (activeUser?.id !== userId) return;
+    if (!savedSettings || !sameSavedValue(savedSettings.payload, sentSettings) || new Date(savedSettings.updated_at).getTime() !== new Date(sentSettingsVersion).getTime()) {
+      throw new Error("別の端末の設定と競合しています。この端末の設定は保持しています。");
+    }
+    if (settingsUpdatedAt === sentSettingsVersion) settingsDirty = false;
+    persistOutbox();
   }
   setSyncState("同期済み");
 }
@@ -1587,6 +1697,7 @@ function mergeCloudEntryRows(rows) {
   const cloudDates = new Set(rows.map((row) => row.entry_date));
   rows.forEach((row) => {
     const date = row.entry_date;
+    if (dirtyEntryDates.has(date)) return;
     const localEntry = localByDate.get(date);
     const localUpdatedAt = localEntry?.updatedAt || new Date(0).toISOString();
     const localDeletedAt = deletedEntries[date] || new Date(0).toISOString();
@@ -1804,6 +1915,12 @@ async function applySession(session) {
   if (nextUser?.id === activeUser?.id) return;
 
   activeUser = nextUser;
+  syncError = "";
+  syncBusy = false;
+  cloudVerified = false;
+  localSaveError = false;
+  dirtyEntryDates.clear();
+  settingsDirty = false;
   if (!activeUser) {
     entries = [];
     deletedEntries = {};
@@ -1836,6 +1953,7 @@ async function applySession(session) {
   foodPresets = loadFoodPresets();
   appliedPresetSeedVersion = loadPresetSeedVersion();
   settingsUpdatedAt = loadSettingsUpdatedAt();
+  restoreOutbox();
   purgeLegacySampleData();
   accountEmail.textContent = activeUser.email || activeUser.id;
   fillProfileForm();
@@ -1869,6 +1987,7 @@ function clearCurrentUserCache() {
     profileStorageKey,
     exercisePresetStorageKey,
     foodPresetStorageKey,
+    outboxStorageKey,
     presetSeedStorageKey,
     deletedEntriesStorageKey,
     settingsUpdatedStorageKey,
@@ -1920,8 +2039,17 @@ function getResendErrorMessage(error) {
 }
 
 function setSyncState(status, message) {
+  const pending = dirtyEntryDates.size + (settingsDirty ? 1 : 0);
+  status = !activeUser ? "ログイン待ち"
+    : localSaveError ? "端末への保存に失敗"
+    : syncBusy ? "クラウドへ同期中"
+    : syncError ? "同期失敗・再試行できます"
+    : pending ? (navigator.onLine ? "端末保存済み・送信待ち" : "端末保存済み・オフライン")
+    : cloudVerified ? "クラウド同期済み" : "クラウド未確認";
   if (syncStatus) syncStatus.textContent = status;
   if (assistantSyncStatus) assistantSyncStatus.textContent = status;
+  const detail = document.querySelector("#assistant-sync-detail");
+  if (detail) detail.textContent = syncError || (pending ? "端末の記録を保持しています。通信が戻ると再送します。" : "");
   const pendingCountLabel = `${dirtyEntryDates.size + (settingsDirty ? 1 : 0)}件`;
   if (pendingSyncCount) pendingSyncCount.textContent = pendingCountLabel;
   if (assistantPendingSyncCount) assistantPendingSyncCount.textContent = pendingCountLabel;
@@ -3667,3 +3795,5 @@ function isPrivateHost(hostname) {
 }
 
 render();
+
+ document.querySelector("#assistant-retry-sync").addEventListener("click", () => { withCloudBusy(document.querySelector("#assistant-retry-sync"), "同期中...", syncFromCloud); });

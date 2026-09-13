@@ -841,8 +841,10 @@
           </label>
           <div class="assistant-sync-card" aria-label="同期状態">
             <span>クラウド</span>
-            <strong id="assistant-sync-status">ログイン待ち</strong>
+            <strong id="assistant-sync-status" role="status" aria-live="polite">ログイン待ち</strong>
             <small>未送信 <b id="assistant-pending-sync-count">0件</b></small>
+            <button type="button" id="assistant-retry-sync" class="text-button">同期を再試行</button>
+            <small id="assistant-sync-detail" role="status" aria-live="polite"></small>
           </div>
         </section>
 
@@ -922,6 +924,7 @@
 
     <script src="config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=20260726-fitbit-exercise-v1"></script>
+    <script src="app.js?v=20260913-save-reliability-v1"></script>
   </body>
 </html>
+
