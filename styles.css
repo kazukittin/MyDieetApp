@@ -2290,6 +2290,93 @@ legend {
   color: white;
 }
 
+.quick-record-section {
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.quick-record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quick-record-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-height: 118px;
+  border: 1px solid rgba(47, 133, 90, 0.35);
+  border-radius: 14px;
+  background: var(--green-soft);
+  color: var(--ink);
+  padding: 15px 16px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.quick-record-button:hover { border-color: var(--green); }
+.quick-record-button:active { transform: scale(0.99); }
+
+.quick-record-button .quick-record-meal {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--green);
+}
+
+.quick-record-button strong { font-size: 1.12rem; }
+.quick-record-button small { color: var(--muted); line-height: 1.5; }
+
+.quick-record-button.is-done {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+
+.quick-record-button.is-done .quick-record-meal,
+.quick-record-button.is-done small { color: rgba(255, 255, 255, 0.88); }
+
+.quick-weight-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.quick-weight-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.quick-weight-form input {
+  width: 170px;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 1.05rem;
+}
+
+.quick-weight-note { color: var(--muted); padding-bottom: 12px; }
+
+.quick-record-section .save-feedback { margin-top: 10px; }
+
+@media (max-width: 640px) {
+  .quick-record-grid { grid-template-columns: minmax(0, 1fr); }
+  .quick-record-button { min-height: 104px; }
+  .quick-weight-form input { width: 150px; }
+}
+
 .summary-overview-section,
 .history-list-section { margin-bottom: 20px; }
 

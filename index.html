@@ -8,7 +8,7 @@
     <title>My Diet Notebook</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css?v=20260726-fitbit-exercise-v1">
+    <link rel="stylesheet" href="styles.css?v=20261108-quick-record-v1">
   </head>
   <body>
     <div id="onboarding" class="onboarding" hidden>
@@ -151,6 +151,47 @@
           <span id="today-completion-badge" class="today-completion-badge">0 / 3</span>
         </div>
         <div id="today-checklist-mount"></div>
+      </section>
+
+      <section class="quick-record-section" aria-labelledby="quick-record-title">
+        <div class="section-title-row compact">
+          <div>
+            <p class="section-kicker">Quick record</p>
+            <h2 id="quick-record-title">ワンタップ記録</h2>
+            <p>いつもの記録は、押すだけで今日に保存されます。間違えたら履歴から削除できます。</p>
+          </div>
+        </div>
+        <div class="quick-record-grid">
+          <button type="button" class="quick-record-button" data-quick-don="lunch">
+            <span class="quick-record-meal">昼食に記録</span>
+            <strong>いつもの丼（昼）</strong>
+            <small>鶏むね野菜煮込み丼・ご飯200g<br>650kcal ・ P45g</small>
+          </button>
+          <button type="button" class="quick-record-button" data-quick-don="dinner">
+            <span class="quick-record-meal">夕食に記録（宿直の夜用）</span>
+            <strong>いつもの丼（夜・軽め）</strong>
+            <small>鶏むね野菜煮込み丼・ご飯150g<br>570kcal ・ P44g</small>
+          </button>
+          <button type="button" class="quick-record-button" data-quick-training="A">
+            <span class="quick-record-meal">運動に記録</span>
+            <strong>自宅トレ A</strong>
+            <small>上半身＋体幹 ・ 30分 ・ 約135kcal</small>
+          </button>
+          <button type="button" class="quick-record-button" data-quick-training="B">
+            <span class="quick-record-meal">運動に記録</span>
+            <strong>自宅トレ B</strong>
+            <small>下半身＋体幹 ・ 30分 ・ 約135kcal</small>
+          </button>
+        </div>
+        <form id="quick-weight-form" class="quick-weight-form">
+          <label>
+            <span>今日の朝の体重 kg</span>
+            <input id="quick-weight-input" type="number" min="20" max="250" step="0.1" inputmode="decimal" placeholder="70.0">
+          </label>
+          <button class="primary-button" type="submit">体重を記録</button>
+          <small id="quick-weight-note" class="quick-weight-note"></small>
+        </form>
+        <p id="quick-record-feedback" class="save-feedback" role="status" aria-live="polite"></p>
       </section>
 
       <section class="unified-section summary-overview-section" aria-labelledby="summary-title">
@@ -838,6 +879,6 @@
       <button type="button" data-open-settings-shortcut>設定</button>
     </nav>
 
-    <script src="app.js?v=20261108-single-user-v1"></script>
+    <script src="app.js?v=20261108-quick-record-v1"></script>
   </body>
 </html>

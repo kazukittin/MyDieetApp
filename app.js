@@ -63,6 +63,18 @@ const assistantRecordFeedback = document.querySelector("#assistant-record-feedba
 const assistantRecordSummary = document.querySelector("#assistant-record-summary");
 const assistantSyncStatus = document.querySelector("#assistant-sync-status");
 const assistantPendingSyncCount = document.querySelector("#assistant-pending-sync-count");
+const quickRecordFeedback = document.querySelector("#quick-record-feedback");
+const quickWeightForm = document.querySelector("#quick-weight-form");
+const quickWeightInput = document.querySelector("#quick-weight-input");
+const quickWeightNote = document.querySelector("#quick-weight-note");
+const QUICK_DON_ITEMS = {
+  lunch: { name: "鶏むね野菜煮込み丼", amount: "ご飯200g", calories: 650, protein: 45, fat: 12, carbs: 90 },
+  dinner: { name: "鶏むね野菜煮込み丼", amount: "ご飯150g（宿直の夜）", calories: 570, protein: 44, fat: 12, carbs: 71 },
+};
+const QUICK_TRAINING_ITEMS = {
+  A: { name: "自宅トレA（上半身＋体幹）", minutes: 30, burnCalories: 135 },
+  B: { name: "自宅トレB（下半身＋体幹）", minutes: 30, burnCalories: 135 },
+};
 const undoToast = document.querySelector("#undo-toast");
 const undoMessage = document.querySelector("#undo-message");
 const undoDeleteButton = document.querySelector("#undo-delete");
@@ -242,6 +254,10 @@ assistantRecordForm.addEventListener("submit", (event) => {
   event.preventDefault();
   saveAssistantRecord();
 });
+
+document.querySelectorAll("[data-quick-don]").forEach((button) => button.addEventListener("click", () => quickRecordDon(button.dataset.quickDon)));
+document.querySelectorAll("[data-quick-training]").forEach((button) => button.addEventListener("click", () => quickRecordTraining(button.dataset.quickTraining)));
+quickWeightForm.addEventListener("submit", quickRecordWeight);
 
 weightDateInput.addEventListener("change", () => {
   fillWeightFieldsForDate(weightDateInput.value);
@@ -1112,6 +1128,119 @@ function saveAssistantRecord() {
   }
 }
 
+function setQuickRecordFeedback(type, message) {
+  if (!quickRecordFeedback) return;
+  quickRecordFeedback.textContent = message;
+  quickRecordFeedback.className = `save-feedback${type ? ` is-${type}` : ""}`;
+}
+
+function refreshQuickRecordState() {
+  const entry = entries.find((item) => item.date === isoToday);
+  document.querySelectorAll("[data-quick-don]").forEach((button) => {
+    const meal = button.dataset.quickDon;
+    const preset = QUICK_DON_ITEMS[meal];
+    const done = Boolean(preset && entry?.mealItems?.[meal]?.some((item) => item.name === preset.name));
+    button.classList.toggle("is-done", done);
+    const label = button.querySelector(".quick-record-meal");
+    if (label) label.textContent = done ? "記録済み ✓（タップで確認）" : (meal === "lunch" ? "昼食に記録" : "夕食に記録（宿直の夜用）");
+  });
+  document.querySelectorAll("[data-quick-training]").forEach((button) => {
+    const preset = QUICK_TRAINING_ITEMS[button.dataset.quickTraining];
+    const done = Boolean(preset && entry?.exerciseItems?.some((item) => item.name === preset.name));
+    button.classList.toggle("is-done", done);
+    const label = button.querySelector(".quick-record-meal");
+    if (label) label.textContent = done ? "記録済み ✓（タップで確認）" : "運動に記録";
+  });
+  if (quickWeightNote && quickWeightInput) {
+    const morning = numberOrNull(entry?.weightMorning);
+    quickWeightNote.textContent = morning !== null
+      ? `今日の朝の体重は ${morning.toFixed(1)}kg で記録済みです。入力し直すと上書きされます。`
+      : "朝、体重計に乗ったらここに入れるだけです。";
+    if (morning !== null && document.activeElement !== quickWeightInput && quickWeightInput.value === "") {
+      quickWeightInput.value = morning.toFixed(1);
+    }
+  }
+}
+
+function quickRecordDon(meal) {
+  if (!activeUser) { setQuickRecordFeedback("error", "ログインしてから記録してください。"); return; }
+  const preset = QUICK_DON_ITEMS[meal];
+  if (!preset) return;
+  const entry = getOrCreateEntry(isoToday);
+  const items = entry.mealItems[meal] || [];
+  if (items.some((item) => item.name === preset.name)) {
+    setQuickRecordFeedback("", `今日の${meal === "lunch" ? "昼食" : "夕食"}には、すでに「${preset.name}」が記録されています。直したい場合は履歴から削除してください。`);
+    return;
+  }
+  entry.mealItems[meal] = [...items, { id: createId(), ...preset }];
+  const previousCalories = entry.mealCalories || {};
+  entry.mealCalories = Object.fromEntries(Object.keys(createEmptyMealItems()).map((key) => [
+    key,
+    entry.mealItems[key].length
+      ? Math.round(entry.mealItems[key].reduce((sum, item) => sum + (item.calories || 0), 0))
+      : (numberOrNull(previousCalories[key]) ?? null),
+  ]));
+  entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
+  entry.meals = getMealsFromCalories(entry.mealCalories);
+  entry.meal = deriveMealScore(entry.meals, []);
+  entry.updatedAt = new Date().toISOString();
+  commitEntry(entry);
+  saveEntries();
+  render();
+  setQuickRecordFeedback("success", `${formatDateLabel(isoToday)}の${meal === "lunch" ? "昼食" : "夕食"}に「${preset.name}（${preset.amount}）」${preset.calories}kcal・P${preset.protein}g を記録しました。`);
+}
+
+function quickRecordTraining(kind) {
+  if (!activeUser) { setQuickRecordFeedback("error", "ログインしてから記録してください。"); return; }
+  const preset = QUICK_TRAINING_ITEMS[kind];
+  if (!preset) return;
+  const entry = getOrCreateEntry(isoToday);
+  if ((entry.exerciseItems || []).some((item) => item.name === preset.name)) {
+    setQuickRecordFeedback("", `今日はすでに「${preset.name}」が記録されています。`);
+    return;
+  }
+  entry.exerciseItems = normalizeExerciseItems([
+    ...(entry.exerciseItems || []),
+    {
+      id: createId(),
+      name: preset.name,
+      baseUnit: "minute",
+      baseAmount: preset.minutes,
+      multiplier: 1,
+      amount: preset.minutes,
+      caloriesPerBase: preset.burnCalories,
+      burnCalories: preset.burnCalories,
+    },
+  ]);
+  entry.burnCalories = sumExerciseItems(entry.exerciseItems, "burnCalories");
+  entry.exerciseMinutes = sumExerciseItems(entry.exerciseItems, "minutes");
+  entry.exerciseName = entry.exerciseItems[0]?.name || "";
+  entry.exerciseType = "";
+  entry.updatedAt = new Date().toISOString();
+  commitEntry(entry);
+  saveEntries();
+  render();
+  setQuickRecordFeedback("success", `${formatDateLabel(isoToday)}に「${preset.name}」${preset.minutes}分・約${preset.burnCalories}kcal を記録しました。お疲れさまです。`);
+}
+
+function quickRecordWeight(event) {
+  event.preventDefault();
+  if (!activeUser) { setQuickRecordFeedback("error", "ログインしてから記録してください。"); return; }
+  const value = numberOrNull(quickWeightInput.value);
+  if (value === null || value < 20 || value > 250) {
+    setQuickRecordFeedback("error", "体重は20〜250kgの数値で入力してください。");
+    return;
+  }
+  const entry = getOrCreateEntry(isoToday);
+  entry.weightMorning = value;
+  entry.weight = getPrimaryWeight(entry);
+  entry.updatedAt = new Date().toISOString();
+  commitEntry(entry);
+  saveEntries();
+  render();
+  setQuickRecordFeedback("success", `${formatDateLabel(isoToday)}の朝の体重 ${value.toFixed(1)}kg を記録しました。`);
+}
+
 function renderAssistantRecordSummary(entry, date) {
   if (!entry) {
     assistantRecordSummary.textContent = `${formatDateLabel(date)}：保存済みの記録はありません。`;
@@ -1454,6 +1583,7 @@ function render() {
   renderWeightOnlyHistory();
   renderFoodShortcuts();
   renderActionInsights();
+  refreshQuickRecordState();
   setSyncState();
 }
 
