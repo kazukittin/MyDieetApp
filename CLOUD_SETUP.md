@@ -1,87 +1,11 @@
-# Supabaseで複数ユーザー対応を有効にする
+# 単一ユーザー版
 
-このアプリはSupabase Authでユーザーを識別し、Row Level Security（RLS）で本人のデータだけを読み書きします。
+ログイン・新規登録・アカウント管理は不要です。`node server.js` または `start-app.bat` で起動し、GitHub Pagesでも静的ファイルのまま利用できます。Supabaseの設定とSDKは読み込みません。
 
-## 1. テーブルとRLSを作成
+記録・プロフィール・プリセットは同じ端末の同じブラウザ・同じ公開URLのlocalStorageに保存します。複数端末間のクラウド同期とGoogle Health連携はこの版では利用できません。既存の歩数記録は保持します。
 
-SupabaseのSQL Editorで `SUPABASE_SETUP.sql` を実行します。以前の版を設定済みの場合も、同期方式とアカウント削除機能を追加するため、最新版をもう一度実行してください。
+設定 → アプリとデータ → バックアップからJSONを書き出し・復元できます。ブラウザのデータ消去や端末変更の前に書き出してください。クラウドにしかない過去データは旧版からJSONを書き出して復元してください。
 
-新しい同期では `diet_entries` と `diet_user_settings` を使います。旧 `diet_user_data` は初回同期時の移行元として読み取るため、全利用者の移行が終わるまでは残してください。
+旧版のアカウント別キャッシュが1人分だけ存在する場合は、未送信データも含めてコピーします。元のキャッシュは削除しません。複数人分ある場合は自動で混ぜず、案内を表示します。使用する人のバックアップを復元してください。
 
-アカウント削除は、現行2テーブルと旧 `diet_user_data` の対象行を明示削除し、残存がないことを確認してから `auth.users` を削除します。処理は1トランザクションなので、途中で失敗した場合は全削除をロールバックします。`SUPABASE_SETUP.sql` を再実行し、最新の `delete_my_account()` を反映してください。
-
-Supabase Storageを将来使う場合は、Authユーザーを削除する前にStorage APIで本人所有のファイルを削除してください。StorageファイルをSQLだけで削除してはいけません。
-
-## 2. メール認証を設定
-
-Supabase DashboardのAuthenticationでEmail認証を有効にします。
-
-- 本番運用では「Confirm email」を有効にする
-- URL ConfigurationのSite URLに公開先URLを設定する
-- Redirect URLsにも公開先URLを追加する
-
-## 3. アプリへ接続情報を設定
-
-`config.js` にSupabaseのProject URLとPublishable keyを設定します。
-
-```js
-window.MY_DIET_CONFIG = {
-  supabaseUrl: "https://YOUR_PROJECT.supabase.co",
-  supabaseAnonKey: "sb_publishable_...",
-  authRedirectUrl: "https://YOUR_PUBLIC_APP_URL/",
-};
-```
-
-Publishable keyはブラウザで使う公開用キーです。`service_role`キーは絶対に設定しないでください。
-
-`authRedirectUrl`には、利用者が実際にアプリを開く公開URLを設定します。空欄の場合は、新規登録時にブラウザで開いていたURLを使用します。
-
-Supabase Dashboardの **Authentication → URL Configuration** でも次のように設定してください。
-
-- Site URL: `https://YOUR_PUBLIC_APP_URL/`
-- Redirect URLs: `https://YOUR_PUBLIC_APP_URL/`
-
-GitHub Pagesでサブディレクトリを使う場合は、リポジトリ名まで含む正確なURLを設定します。例: `https://username.github.io/MyDieetApp/`
-
-設定変更前に送信済みの確認メールには古いURLが残ります。古いリンクではなく、設定後に送った確認メールを使用してください。古いリンクをクリックした時点でメール確認だけ完了している場合もあるため、先に通常ログインを試しても構いません。
-
-## 4. 公開
-
-次のファイルを同じ場所へ公開します。
-
-- `index.html`
-- `styles.css`
-- `app.js`
-- `config.js`
-
-利用者はログイン画面から各自のメールアドレスで登録します。ログイン後のデータはユーザーID別に分離され、端末内キャッシュも別々に保存されます。
-
-## 5. 自分専用のGoogle Health歩数連携
-
-Google CloudでGoogle Health APIを有効にし、OAuthクライアントを1件登録します。
-
-- Application Type: `Web application`
-- Authorized redirect URI: `https://YOUR_PROJECT.supabase.co/functions/v1/fitbit-callback`
-- Test user: 自分のGoogleアカウント
-
-アプリが要求する権限は歩数取得に必要な`googlehealth.activity_and_fitness.readonly`だけです。
-
-Supabase CLIでGoogleのClient ID、Client Secret、アプリの公開URLをSecretsへ登録します。Client Secretは`config.js`やGitHubへ保存しないでください。
-
-OAuth同意画面が **Testing** のままだと、Google Healthのようなユーザーデータ用スコープを含む更新トークンは7日で失効します。継続利用する公開環境では、Google Cloud Consoleの **Google Auth Platform → Audience** で公開ステータスを **In production** にし、必要に応じてGoogleの検証手続きを完了してください。Testingのまま運用する場合は、7日ごとに再連携が必要です。
-
-```powershell
-supabase secrets set GOOGLE_HEALTH_CLIENT_ID="YOUR_CLIENT_ID"
-supabase secrets set GOOGLE_HEALTH_CLIENT_SECRET="YOUR_CLIENT_SECRET"
-supabase secrets set GOOGLE_HEALTH_APP_URL="https://YOUR_PUBLIC_APP_URL/"
-```
-
-SQL Editorで最新版の`SUPABASE_SETUP.sql`を実行してから、3つのEdge Functionをデプロイします。
-
-```powershell
-supabase functions deploy fitbit-auth
-supabase functions deploy fitbit-callback --no-verify-jwt
-supabase functions deploy fitbit-sync
-```
-
-公開アプリへログインし、`設定 → アプリ → Google Health歩数連携`から接続します。初回接続時に直近30日分、その後は「歩数を同期」で直近30日分を再取得します。同期済みの日付は最新のGoogle Health値で更新され、食事・体重・運動の手入力には影響しません。
+`SUPABASE_SETUP.sql` と `supabase/functions/` は旧版の運用資料です。この版で実行・デプロイする必要はありません。既存のクラウドデータやRLS設定は変更しません。

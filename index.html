@@ -11,33 +11,6 @@
     <link rel="stylesheet" href="styles.css?v=20260726-fitbit-exercise-v1">
   </head>
   <body>
-    <div id="auth-screen" class="auth-screen">
-      <section class="auth-card" aria-label="My Diet Notebook ログイン">
-        <p class="section-kicker">My Diet Notebook</p>
-
-        <form id="auth-form" class="auth-form" autocomplete="on">
-          <label>
-            <span>メールアドレス</span>
-            <input id="auth-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
-          </label>
-          <label>
-            <span>パスワード</span>
-            <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="8文字以上">
-          </label>
-          <button id="auth-submit" class="primary-button" type="submit">ログイン</button>
-          <button id="auth-mode-toggle" class="ghost-button" type="button">初めての方はこちら（新規登録）</button>
-          <button id="forgot-password" class="text-button" type="button">パスワードを忘れた方</button>
-          <button id="resend-confirmation" class="text-button" type="button">確認メールを再送</button>
-          <p id="auth-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
-        </form>
-
-        <div id="auth-config-help" class="auth-config-help" hidden>
-          <strong>Supabaseの接続設定が必要です</strong>
-          <p><code>config.js</code>にProject URLとPublishable keyを設定してください。</p>
-        </div>
-      </section>
-    </div>
-
     <div id="onboarding" class="onboarding" hidden>
       <form id="onboarding-form" class="onboarding-card" autocomplete="off">
         <p class="section-kicker">First setup</p>
@@ -94,7 +67,6 @@
         <div class="settings-tabs" role="tablist" aria-label="設定カテゴリー">
           <button class="is-active" type="button" role="tab" data-settings-tab="profile">プロフィール</button>
           <button type="button" role="tab" data-settings-tab="app">アプリ</button>
-          <button type="button" role="tab" data-settings-tab="account">アカウント</button>
         </div>
 
         <div class="settings-grid">
@@ -147,66 +119,11 @@
               <div class="setting-action-card"><div><strong>ホーム画面に追加</strong><p>アプリのように素早く起動できます。</p></div><button id="install-app" class="ghost-button" type="button" hidden>インストール</button></div>
               <div class="setting-action-card"><div><strong>記録リマインダー</strong><p>指定時刻に、この端末で記録を促します。</p></div><label><span>時刻</span><input id="reminder-time" type="time" value="21:00"></label><button id="enable-reminder" class="ghost-button" type="button">通知を有効にする</button></div>
               <div class="setting-action-card"><div><strong>バックアップ</strong><p>プロフィール、記録、プリセットをJSONで保存・復元します。</p></div><div class="account-secondary-actions"><button id="export-backup" class="ghost-button" type="button">書き出す</button><button id="import-backup" class="ghost-button" type="button">復元する</button><input id="import-backup-file" type="file" accept="application/json,.json" hidden></div></div>
-              <div class="setting-action-card fitbit-setting-card">
-                <div><strong>Google Health歩数連携</strong><p id="fitbit-status">接続状態を確認しています。</p><small>歩数を推定ウォーキング時間・消費カロリーとして運動に合算します。</small><small id="fitbit-last-sync"></small></div>
-                <div class="account-secondary-actions">
-                  <button id="fitbit-connect" class="primary-button" type="button">Google Healthを連携</button>
-                  <button id="fitbit-sync" class="ghost-button" type="button" hidden>歩数を同期</button>
-                  <button id="fitbit-disconnect" class="danger-button" type="button" hidden>連携解除</button>
-                </div>
-              </div>
+              <p>記録はこのブラウザに1人分保存します。別の端末への移動やブラウザのデータ消去に備え、バックアップを書き出してください。Google Health連携・クラウド同期は単一ユーザー版では利用しません。</p>
               <p id="app-settings-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
             </div>
           </section>
 
-          <section class="settings-section" data-settings-panel="account" hidden>
-            <div class="settings-section-heading">
-              <div>
-                <h3>アカウント</h3>
-                <p>ログインとセキュリティを管理します。</p>
-              </div>
-              <span class="sync-state-pill">自動同期</span>
-            </div>
-            <div class="account-panel">
-              <span>メールアドレス</span>
-              <strong id="account-email">--</strong>
-
-              <details class="account-disclosure">
-                <summary>メールアドレスを変更</summary>
-                <form id="email-change-form" class="compact-account-form">
-                  <label>
-                    <span>新しいメールアドレス</span>
-                    <input id="new-account-email" type="email" required placeholder="new@example.com">
-                  </label>
-                  <button class="ghost-button" type="submit">確認メールを送る</button>
-                </form>
-              </details>
-
-              <details class="account-disclosure">
-                <summary>パスワードを変更</summary>
-                <form id="password-change-form" class="compact-account-form">
-                  <label>
-                    <span>新しいパスワード</span>
-                    <input id="new-account-password" type="password" minlength="8" required placeholder="8文字以上">
-                  </label>
-                  <button class="ghost-button" type="submit">パスワードを更新</button>
-                </form>
-              </details>
-
-              <div class="account-secondary-actions">
-                <button id="sync-now" class="text-button" type="button">今すぐ同期</button>
-                <button id="logout-button" class="ghost-button" type="button">ログアウト</button>
-              </div>
-              <p class="sync-detail">同期状態: <strong id="sync-status">ログイン待ち</strong>・未送信 <strong id="pending-sync-count">0件</strong></p>
-
-              <details class="account-disclosure danger-disclosure">
-                <summary>危険な操作</summary>
-                <p>アカウントとすべての記録を完全に削除します。この操作は元に戻せません。</p>
-                <button id="delete-account" class="ghost-button danger-button" type="button">アカウントと全データを削除</button>
-              </details>
-              <p id="cloud-feedback" class="cloud-feedback" role="status" aria-live="polite"></p>
-            </div>
-          </section>
 
         </div>
       </section>
@@ -840,10 +757,9 @@
             <input type="date" id="assistant-record-date" name="date" required>
           </label>
           <div class="assistant-sync-card" aria-label="同期状態">
-            <span>クラウド</span>
+            <span>端末保存</span>
             <strong id="assistant-sync-status" role="status" aria-live="polite">ログイン待ち</strong>
-            <small>未送信 <b id="assistant-pending-sync-count">0件</b></small>
-            <button type="button" id="assistant-retry-sync" class="text-button">同期を再試行</button>
+            <small>未保存 <b id="assistant-pending-sync-count">0件</b></small>
             <small id="assistant-sync-detail" role="status" aria-live="polite"></small>
           </div>
         </section>
@@ -922,9 +838,7 @@
       <button type="button" data-open-settings-shortcut>設定</button>
     </nav>
 
-    <script src="config.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=20260913-save-reliability-v1"></script>
+    <script src="app.js?v=20261108-single-user-v1"></script>
   </body>
 </html>
 
