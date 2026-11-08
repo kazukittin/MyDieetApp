@@ -17,25 +17,7 @@ const foodDateInput = document.querySelector("#food-date");
 const clearTodayButton = document.querySelector("#clear-today");
 const exportButton = document.querySelector("#export-data");
 const syncStatus = document.querySelector("#sync-status");
-const syncNowButton = document.querySelector("#sync-now");
 const cloudFeedback = document.querySelector("#cloud-feedback");
-const authScreen = document.querySelector("#auth-screen");
-const authForm = document.querySelector("#auth-form");
-const authEmail = document.querySelector("#auth-email");
-const authPassword = document.querySelector("#auth-password");
-const authSubmit = document.querySelector("#auth-submit");
-const authModeToggle = document.querySelector("#auth-mode-toggle");
-const forgotPasswordButton = document.querySelector("#forgot-password");
-const resendConfirmationButton = document.querySelector("#resend-confirmation");
-const authFeedback = document.querySelector("#auth-feedback");
-const authConfigHelp = document.querySelector("#auth-config-help");
-const accountEmail = document.querySelector("#account-email");
-const logoutButton = document.querySelector("#logout-button");
-const emailChangeForm = document.querySelector("#email-change-form");
-const newAccountEmail = document.querySelector("#new-account-email");
-const passwordChangeForm = document.querySelector("#password-change-form");
-const newAccountPassword = document.querySelector("#new-account-password");
-const deleteAccountButton = document.querySelector("#delete-account");
 const appShell = document.querySelector(".app-shell");
 const onboarding = document.querySelector("#onboarding");
 const onboardingForm = document.querySelector("#onboarding-form");
@@ -56,11 +38,6 @@ const recentFoodList = document.querySelector("#recent-food-list");
 const pendingSyncCount = document.querySelector("#pending-sync-count");
 const appSettingsFeedback = document.querySelector("#app-settings-feedback");
 const importBackupFile = document.querySelector("#import-backup-file");
-const fitbitConnectButton = document.querySelector("#fitbit-connect");
-const fitbitSyncButton = document.querySelector("#fitbit-sync");
-const fitbitDisconnectButton = document.querySelector("#fitbit-disconnect");
-const fitbitStatus = document.querySelector("#fitbit-status");
-const fitbitLastSync = document.querySelector("#fitbit-last-sync");
 const saveFoodPresetButton = document.querySelector("#save-food-preset");
 const cancelFoodPresetEditButton = document.querySelector("#cancel-food-preset-edit");
 const rangeButtons = document.querySelectorAll("[data-range-days]");
@@ -102,16 +79,8 @@ const presetSeedStorageKey = "my-diet-notebook:preset-seed-version:v1";
 const currentPresetSeedVersion = 1;
 const deletedEntriesStorageKey = "my-diet-notebook:deleted-entries:v1";
 const settingsUpdatedStorageKey = "my-diet-notebook:settings-updated:v1";
-const legacyCloudTable = "diet_user_data";
-const entriesCloudTable = "diet_entries";
-const settingsCloudTable = "diet_user_settings";
-const appConfig = window.MY_DIET_CONFIG || {};
-const supabaseClient = hasSupabaseConfig() && window.supabase
-  ? window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey)
-  : null;
 const exerciseHabitValues = ["walk", "stretch", "strength"];
-let activeUser = null;
-let authMode = "login";
+const activeUser = { id: "single-user" };
 let entries = [];
 let deletedEntries = {};
 let profile = {};
@@ -128,18 +97,7 @@ let undoTimer = null;
 const dirtyEntryDates = new Set();
 let settingsDirty = false;
 const outboxStorageKey = "my-diet-notebook:outbox:v1";
-let syncQueue = Promise.resolve();
-let syncError = "";
-let syncBusy = false;
-let cloudVerified = false;
 let localSaveError = false;
-
-function sameSavedValue(a, b) {
-  if (a === b) return true;
-  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
-  const keys = Object.keys(a);
-  return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && sameSavedValue(a[key], b[key]));
-}
 
 function persistOutbox() {
   if (!activeUser) return;
@@ -179,27 +137,6 @@ function restoreOutbox() {
   entries.sort((a, b) => b.date.localeCompare(a.date));
 }
 
-function queueSync(action) {
-  const userId = activeUser?.id;
-  const task = syncQueue.catch(() => {}).then(async () => {
-    if (!userId || activeUser?.id !== userId) return;
-    if (!navigator.onLine) { setSyncState(); return; }
-    syncBusy = true;
-    syncError = "";
-    setSyncState();
-    try {
-      await action(userId);
-      if (activeUser?.id === userId) cloudVerified = true;
-    } catch (error) {
-      if (activeUser?.id === userId) syncError = getCloudErrorMessage(error);
-      throw error;
-    } finally {
-      if (activeUser?.id === userId) { syncBusy = false; setSyncState(); }
-    }
-  });
-  syncQueue = task;
-  return task;
-}
 let editingExercisePresetId = null;
 let selectedExercisePresetId = null;
 let editingFoodPresetId = null;
@@ -207,7 +144,7 @@ let selectedFoodMeal = "breakfast";
 let foodMealItemsDraft = createEmptyMealItems();
 let exerciseItemsDraft = [];
 let deferredInstallPrompt = null;
-let fitbitConnected = false;
+
 
 [weightDateInput, exerciseDateInput, foodDateInput].forEach((input) => {
   input.value = isoToday;
@@ -221,8 +158,8 @@ setupUnifiedScreen();
 if (document.querySelector("#today-label")) {
   document.querySelector("#today-label").textContent = formatDateLabel(isoToday);
 }
-if (syncStatus) syncStatus.textContent = "ログイン待ち";
-initializeAuth();
+
+initializeSingleUser();
 registerServiceWorker();
 restoreReminderSettings();
 
@@ -330,9 +267,6 @@ document.querySelector("[data-open-settings-shortcut]").addEventListener("click"
 document.querySelector("#export-backup").addEventListener("click", exportFullBackup);
 document.querySelector("#import-backup").addEventListener("click", () => importBackupFile.click());
 importBackupFile.addEventListener("change", importFullBackup);
-fitbitConnectButton.addEventListener("click", connectFitbit);
-fitbitSyncButton.addEventListener("click", () => syncFitbitSteps(30));
-fitbitDisconnectButton.addEventListener("click", disconnectFitbit);
 document.querySelector("#install-app").addEventListener("click", installApp);
 document.querySelector("#enable-reminder").addEventListener("click", enableReminder);
 document.querySelector("#reminder-time").addEventListener("change", saveReminderSettings);
@@ -360,142 +294,6 @@ exportButton.addEventListener("click", () => {
   link.download = `my-diet-notebook-${isoToday}.json`;
   link.click();
   URL.revokeObjectURL(url);
-});
-
-syncNowButton.addEventListener("click", (event) => {
-  event.preventDefault();
-  if (!activeUser) {
-    dirtyEntryDates.clear();
-    settingsDirty = false;
-    setCloudFeedback("error", "ログインしてください。");
-    return;
-  }
-  setCloudFeedback("loading", "クラウドと同期しています...");
-  withCloudBusy(syncNowButton, "同期中...", async () => {
-    await syncFromCloud();
-    setCloudFeedback("success", "最新データに同期しました。");
-  });
-});
-
-authModeToggle.addEventListener("click", () => {
-  authMode = authMode === "login" ? "signup" : "login";
-  updateAuthMode();
-});
-
-resendConfirmationButton.addEventListener("click", async () => {
-  if (!supabaseClient) return;
-  const email = authEmail.value.trim();
-  if (!email) {
-    setAuthFeedback("error", "確認メールを送るメールアドレスを入力してください。");
-    authEmail.focus();
-    return;
-  }
-
-  setAuthBusy(true);
-  setAuthFeedback("loading", "確認メールを再送しています...");
-  const { error } = await supabaseClient.auth.resend({
-    type: "signup",
-    email,
-    options: {
-      emailRedirectTo: getAuthRedirectUrl(),
-    },
-  });
-  setAuthBusy(false);
-
-  if (error) {
-    setAuthFeedback("error", getResendErrorMessage(error));
-    return;
-  }
-  setAuthFeedback("success", "確認メールを再送しました。迷惑メールフォルダも確認してください。");
-});
-
-forgotPasswordButton.addEventListener("click", async () => {
-  if (!supabaseClient) return;
-  const email = authEmail.value.trim();
-  if (!email) {
-    setAuthFeedback("error", "登録したメールアドレスを入力してください。");
-    authEmail.focus();
-    return;
-  }
-  setAuthBusy(true);
-  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: getAuthRedirectUrl(),
-  });
-  setAuthBusy(false);
-  setAuthFeedback(error ? "error" : "success", error
-    ? "再設定メールを送れませんでした。少し待ってから試してください。"
-    : "パスワード再設定メールを送りました。");
-});
-
-authForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!supabaseClient) {
-    setAuthFeedback("error", "Supabaseの接続設定がありません。");
-    return;
-  }
-
-  const email = authEmail.value.trim();
-  const password = authPassword.value;
-  setAuthBusy(true);
-  setAuthFeedback("loading", authMode === "signup" ? "アカウントを作成しています..." : "ログインしています...");
-
-  const result = authMode === "signup"
-    ? await supabaseClient.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: getAuthRedirectUrl(),
-      },
-    })
-    : await supabaseClient.auth.signInWithPassword({ email, password });
-
-  setAuthBusy(false);
-  if (result.error) {
-    setAuthFeedback("error", getAuthErrorMessage(result.error));
-    return;
-  }
-
-  if (authMode === "signup" && !result.data.session) {
-    setAuthFeedback("success", "確認メールを送りました。メール内のリンクを開いてからログインしてください。");
-  }
-});
-
-logoutButton.addEventListener("click", async () => {
-  if (!supabaseClient) return;
-  await supabaseClient.auth.signOut();
-});
-
-emailChangeForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const { error } = await supabaseClient.auth.updateUser({ email: newAccountEmail.value.trim() });
-  setCloudFeedback(error ? "error" : "success", error
-    ? "メールアドレスを変更できませんでした。"
-    : "確認メールを送りました。メール内のリンクを開くと変更されます。");
-  if (!error) emailChangeForm.reset();
-});
-
-passwordChangeForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const { error } = await supabaseClient.auth.updateUser({ password: newAccountPassword.value });
-  setCloudFeedback(error ? "error" : "success", error
-    ? "パスワードを変更できませんでした。"
-    : "パスワードを変更しました。");
-  if (!error) passwordChangeForm.reset();
-});
-
-deleteAccountButton.addEventListener("click", async () => {
-  const confirmation = window.prompt("完全に削除するには「削除」と入力してください。");
-  if (confirmation !== "削除") return;
-  deleteAccountButton.disabled = true;
-  const { error } = await supabaseClient.rpc("delete_my_account");
-  deleteAccountButton.disabled = false;
-  if (error) {
-    setCloudFeedback("error", "アカウントを削除できませんでした。SQL設定を確認してください。");
-    return;
-  }
-  clearCurrentUserCache();
-  await supabaseClient.auth.signOut({ scope: "local" });
-  location.reload();
 });
 
 openWeightModalButtons.forEach((button) => {
@@ -1022,10 +820,8 @@ function fillProfileForm() {
 
 function openSettings() {
   fillProfileForm();
-  accountEmail.textContent = activeUser?.email || "--";
   switchSettingsTab("profile");
   settingsScreen.hidden = false;
-  refreshFitbitStatus();
 }
 
 function closeSettings() {
@@ -1273,7 +1069,7 @@ function parseAssistantExerciseItems(value) {
 }
 
 function saveAssistantRecord() {
-  if (!activeUser) { setAssistantRecordFeedback("error", "ログインしてから保存してください。"); return; }
+  if (!activeUser) { setAssistantRecordFeedback("error", "端末の保存設定を確認してください。"); return; }
   const date = assistantRecordDate.value;
   if (!date) {
     setAssistantRecordFeedback("error", "記録日を選択してください。");
@@ -1310,7 +1106,7 @@ function saveAssistantRecord() {
     saveEntries();
     render();
     renderAssistantRecordSummary(entry, date);
-    setAssistantRecordFeedback("success", `${formatDateLabel(date)}の体重・食事・運動を端末に保存しました。クラウドへの送信状況は上の表示で確認できます。`);
+    setAssistantRecordFeedback("success", `${formatDateLabel(date)}の体重・食事・運動を端末に保存しました。設定からバックアップを書き出せます。`);
   } catch (error) {
     setAssistantRecordFeedback("error", error.message || "入力形式を確認してください。");
   }
@@ -1517,434 +1313,16 @@ function fillWeightFieldsForDate(date) {
   document.querySelector("#weight-night").value = entry?.weightNight ?? "";
 }
 
-function mergeEntries(localEntries, serverEntries) {
-  const byDate = new Map();
-  [...serverEntries, ...localEntries].forEach((entry) => {
-    const normalized = normalizeEntryWeights(entry);
-    if (!normalized?.date) return;
-    const current = byDate.get(normalized.date);
-    if (!current || new Date(entry.updatedAt || 0) > new Date(current.updatedAt || 0)) {
-      byDate.set(normalized.date, normalized);
-    }
-  });
-  return Array.from(byDate.values());
-}
+function syncFromCloud() { setSyncState(); return Promise.resolve(); }
 
-function syncFromCloud() { return queueSync(syncFromCloudNow); }
-
-async function syncFromCloudNow(userId) {
-  if (!activeUser || !supabaseClient) return;
-
-  try {
-    setSyncState("同期中");
-    const [entryResult, settingsResult] = await Promise.all([
-      supabaseClient
-        .from(entriesCloudTable)
-        .select("entry_date,payload,updated_at,deleted_at")
-        .eq("user_id", activeUser.id),
-      supabaseClient
-        .from(settingsCloudTable)
-        .select("payload,updated_at")
-        .eq("user_id", activeUser.id)
-        .maybeSingle(),
-    ]);
-    if (activeUser?.id !== userId) return;
-    if (entryResult.error) throw entryResult.error;
-    if (settingsResult.error) throw settingsResult.error;
-
-    let cloudRows = entryResult.data || [];
-    let cloudSettings = settingsResult.data;
-    if (!cloudRows.length && !cloudSettings) {
-      const legacyData = await fetchLegacyCloudData();
-      if (activeUser?.id !== userId) return;
-      if (legacyData) {
-        const legacyEntries = Array.isArray(legacyData) ? legacyData : legacyData.entries;
-        entries = mergeEntries(entries, Array.isArray(legacyEntries) ? legacyEntries : []);
-        if (legacyData.profile) profile = legacyData.profile;
-        appliedPresetSeedVersion = Number.isInteger(Number(legacyData.presetSeedVersion))
-          ? Number(legacyData.presetSeedVersion)
-          : appliedPresetSeedVersion;
-        if (Array.isArray(legacyData.exercisePresets)) {
-          exercisePresets = normalizeExercisePresetList(legacyData.exercisePresets);
-        }
-        if (Array.isArray(legacyData.foodPresets)) {
-          foodPresets = normalizeFoodPresetList(legacyData.foodPresets);
-        }
-        settingsUpdatedAt = new Date().toISOString();
-      }
-      entries.forEach((entry) => dirtyEntryDates.add(entry.date));
-      Object.keys(deletedEntries).forEach((date) => dirtyEntryDates.add(date));
-      settingsDirty = true;
-    } else {
-      mergeCloudEntryRows(cloudRows);
-      if (!settingsDirty && cloudSettings?.payload && new Date(cloudSettings.updated_at) >= new Date(settingsUpdatedAt)) {
-        profile = cloudSettings.payload.profile || {};
-        exercisePresets = Array.isArray(cloudSettings.payload.exercisePresets)
-          ? normalizeExercisePresetList(cloudSettings.payload.exercisePresets)
-          : [];
-        foodPresets = Array.isArray(cloudSettings.payload.foodPresets)
-          ? normalizeFoodPresetList(cloudSettings.payload.foodPresets)
-          : [];
-        appliedPresetSeedVersion = Number.isInteger(Number(cloudSettings.payload.presetSeedVersion))
-          ? Number(cloudSettings.payload.presetSeedVersion)
-          : 0;
-        settingsUpdatedAt = cloudSettings.updated_at;
-      } else {
-        settingsDirty = true;
-      }
-    }
-
-    ensureInitialPresets();
-    purgeLegacySampleData();
-    entries.sort((a, b) => b.date.localeCompare(a.date));
-    persistOutbox();
-    localStorage.setItem(getUserStorageKey(storageKey), JSON.stringify(entries));
-    saveDeletedEntries();
-    saveProfileToDevice();
-    saveExercisePresets();
-    saveFoodPresets();
-    savePresetSeedVersion();
-    localStorage.setItem(getUserStorageKey(settingsUpdatedStorageKey), settingsUpdatedAt);
-    await pushEntriesToCloudNow(userId);
-    if (activeUser?.id !== userId) return;
-    setSyncState("同期済み");
-    fillProfileForm();
-    // Background sync must not replace unsaved form input.
-    showOnboardingIfNeeded();
-    render();
-  } catch (error) {
-    const message = getCloudErrorMessage(error);
-    setSyncState("同期エラー", message);
-    setCloudFeedback("error", message);
-    throw error;
-  }
-}
-
-function pushEntriesToCloud() { return queueSync(pushEntriesToCloudNow); }
-
-async function pushEntriesToCloudNow(userId) {
-  if (!activeUser || !supabaseClient) return;
-
-  persistOutbox();
-  const rows = Array.from(dirtyEntryDates).map((date) => {
-    const entry = entries.find((item) => item.date === date);
-    if (entry) {
-      return {
-        user_id: activeUser.id,
-        entry_date: date,
-        payload: JSON.parse(JSON.stringify(entry)),
-        updated_at: entry.updatedAt || new Date().toISOString(),
-        deleted_at: null,
-      };
-    }
-    const deletedAt = deletedEntries[date] || new Date().toISOString();
-    return {
-      user_id: activeUser.id,
-      entry_date: date,
-      payload: {},
-      updated_at: deletedAt,
-      deleted_at: deletedAt,
-    };
-  });
-
-  if (rows.length) {
-    const { data: savedRows, error: entryError } = await supabaseClient
-      .from(entriesCloudTable)
-      .upsert(rows, { onConflict: "user_id,entry_date" })
-      .select("entry_date,payload,updated_at,deleted_at");
-    if (entryError) throw entryError;
-    if (activeUser?.id !== userId) return;
-    if (!rows.every((row) => savedRows?.some((saved) =>
-      saved.entry_date === row.entry_date
-      && new Date(saved.updated_at).getTime() === new Date(row.updated_at).getTime()
-      && sameSavedValue(saved.payload, row.payload)
-      && (saved.deleted_at ? new Date(saved.deleted_at).getTime() : null) === (row.deleted_at ? new Date(row.deleted_at).getTime() : null)))) {
-      throw new Error("別の端末の新しい記録と競合しています。この端末の記録は保持しています。バックアップを書き出して内容を確認してください。");
-    }
-    rows.forEach((row) => {
-      const current = entries.find((entry) => entry.date === row.entry_date);
-      const unchanged = row.deleted_at
-        ? !current && deletedEntries[row.entry_date] === row.deleted_at
-        : current && JSON.stringify(current) === JSON.stringify(row.payload);
-      if (unchanged) dirtyEntryDates.delete(row.entry_date);
-    });
-    persistOutbox();
-  }
-
-  if (settingsDirty) {
-    const sentSettingsVersion = settingsUpdatedAt;
-    const sentSettings = JSON.parse(JSON.stringify({ profile, exercisePresets, foodPresets, presetSeedVersion: appliedPresetSeedVersion }));
-    const { data: savedSettings, error: settingsError } = await supabaseClient
-      .from(settingsCloudTable)
-      .upsert({
-        user_id: activeUser.id,
-        payload: sentSettings,
-        updated_at: settingsUpdatedAt,
-      }, { onConflict: "user_id" }).select("payload,updated_at").single();
-    if (settingsError) throw settingsError;
-    if (activeUser?.id !== userId) return;
-    if (!savedSettings || !sameSavedValue(savedSettings.payload, sentSettings) || new Date(savedSettings.updated_at).getTime() !== new Date(sentSettingsVersion).getTime()) {
-      throw new Error("別の端末の設定と競合しています。この端末の設定は保持しています。");
-    }
-    if (settingsUpdatedAt === sentSettingsVersion) settingsDirty = false;
-    persistOutbox();
-  }
-  setSyncState("同期済み");
-}
-
-function mergeCloudEntryRows(rows) {
-  const localByDate = new Map(entries.map((entry) => [entry.date, entry]));
-  const cloudDates = new Set(rows.map((row) => row.entry_date));
-  rows.forEach((row) => {
-    const date = row.entry_date;
-    if (dirtyEntryDates.has(date)) return;
-    const localEntry = localByDate.get(date);
-    const localUpdatedAt = localEntry?.updatedAt || new Date(0).toISOString();
-    const localDeletedAt = deletedEntries[date] || new Date(0).toISOString();
-    const localLatest = new Date(localDeletedAt) > new Date(localUpdatedAt) ? localDeletedAt : localUpdatedAt;
-    const cloudLatest = row.deleted_at || row.updated_at || new Date(0).toISOString();
-    if (new Date(cloudLatest) < new Date(localLatest)) {
-      dirtyEntryDates.add(date);
-      return;
-    }
-
-    if (row.deleted_at) {
-      localByDate.delete(date);
-      deletedEntries[date] = row.deleted_at;
-      return;
-    }
-
-    const normalized = normalizeEntryWeights({ ...(row.payload || {}), date, updatedAt: row.updated_at });
-    localByDate.set(date, normalized);
-    delete deletedEntries[date];
-  });
-  localByDate.forEach((_entry, date) => {
-    if (!cloudDates.has(date)) dirtyEntryDates.add(date);
-  });
-  Object.keys(deletedEntries).forEach((date) => {
-    if (!cloudDates.has(date)) dirtyEntryDates.add(date);
-  });
-  entries = Array.from(localByDate.values());
-}
-
-async function fetchLegacyCloudData() {
-  const { data, error } = await supabaseClient
-    .from(legacyCloudTable)
-    .select("payload")
-    .eq("user_id", activeUser.id)
-    .maybeSingle();
-  if (error) return null;
-  return data?.payload || null;
-}
+function pushEntriesToCloud() { setSyncState(); return Promise.resolve(); }
 
 function getCloudErrorMessage(error) {
-  const message = String(error?.message || "");
-  if (message.includes("does not exist") || message.includes("Could not find the table")) {
-    return "Supabaseの同期テーブルが見つかりません。SUPABASE_SETUP.sqlを実行してください。";
-  }
-  if (message.includes("permission denied") || message.includes("row-level security")) {
-    return "データベースのRLS設定を確認してください。";
-  }
-  return "クラウド同期に失敗しました。";
+  return error?.message || "端末への保存に失敗しました。";
 }
 
-async function invokeFitbitFunction(name, body) {
-  if (!supabaseClient || !activeUser) throw new Error("ログインが必要です。");
-  const { data, error } = await supabaseClient.functions.invoke(name, { body });
-  if (error) {
-    let message = error.message;
-    try {
-      const response = error.context;
-      const payload = response && typeof response.json === "function" ? await response.json() : null;
-      message = payload?.error || message;
-    } catch {
-      // Use the function client's original message.
-    }
-    throw new Error(message || "Fitbitとの通信に失敗しました。");
-  }
-  if (data?.error) throw new Error(data.error);
-  return data;
-}
-
-async function refreshFitbitStatus() {
-  if (!activeUser) return;
-  fitbitStatus.textContent = "接続状態を確認しています。";
-  try {
-    const data = await invokeFitbitFunction("fitbit-sync", { action: "status" });
-    updateFitbitControls(Boolean(data.connected), data.lastSyncedAt);
-  } catch (error) {
-    fitbitStatus.textContent = "Google Health機能の設定を確認してください。";
-    fitbitLastSync.textContent = error.message;
-  }
-}
-
-function updateFitbitControls(connected, lastSyncedAt = null) {
-  fitbitConnected = connected;
-  fitbitStatus.textContent = connected ? "Google Healthと連携済みです。" : "まだGoogle Healthと連携していません。";
-  fitbitLastSync.textContent = lastSyncedAt
-    ? `最終同期: ${new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(new Date(lastSyncedAt))}`
-    : "";
-  fitbitConnectButton.hidden = connected;
-  fitbitSyncButton.hidden = !connected;
-  fitbitDisconnectButton.hidden = !connected;
-}
-
-async function connectFitbit() {
-  fitbitConnectButton.disabled = true;
-  fitbitStatus.textContent = "Google Healthの認証画面を準備しています。";
-  try {
-    const returnUrl = `${location.origin}${location.pathname}`;
-    const data = await invokeFitbitFunction("fitbit-auth", { returnUrl });
-    location.assign(data.authorizationUrl);
-  } catch (error) {
-    fitbitStatus.textContent = error.message;
-    fitbitConnectButton.disabled = false;
-  }
-}
-
-async function syncFitbitSteps(days = 30) {
-  fitbitSyncButton.disabled = true;
-    fitbitStatus.textContent = "Google Healthから歩数を同期しています。";
-  try {
-    const data = await invokeFitbitFunction("fitbit-sync", { action: "sync", days, endDate: isoToday });
-    const syncedAt = data.lastSyncedAt || new Date().toISOString();
-    (data.steps || []).forEach((item) => {
-      if (!item?.date) return;
-      const entry = getOrCreateEntry(item.date);
-      entry.fitbitSteps = Math.max(0, Math.round(Number(item.steps) || 0));
-      entry.fitbitSyncedAt = syncedAt;
-      commitEntry(entry);
-    });
-    saveEntries();
-    render();
-    updateFitbitControls(true, syncedAt);
-    fitbitStatus.textContent = `${data.steps?.length || 0}日分の歩数を同期しました。`;
-  } catch (error) {
-    if (error.message.includes("認証期限が切れました")) {
-      updateFitbitControls(false);
-      fitbitStatus.textContent = `${error.message}「Google Healthを連携」から再接続できます。`;
-    } else {
-      fitbitStatus.textContent = error.message;
-    }
-  } finally {
-    fitbitSyncButton.disabled = false;
-  }
-}
-
-async function disconnectFitbit() {
-  if (!window.confirm("Google Health連携を解除しますか？ 同期済みの歩数は記録に残ります。")) return;
-  fitbitDisconnectButton.disabled = true;
-  try {
-    await invokeFitbitFunction("fitbit-sync", { action: "disconnect" });
-    updateFitbitControls(false);
-  } catch (error) {
-    fitbitStatus.textContent = error.message;
-  } finally {
-    fitbitDisconnectButton.disabled = false;
-  }
-}
-
-async function handleFitbitReturn() {
-  const url = new URL(location.href);
-  const result = url.searchParams.get("fitbit");
-  const errorCode = url.searchParams.get("fitbit_error");
-  if (!result) return;
-  url.searchParams.delete("fitbit");
-  url.searchParams.delete("fitbit_error");
-  history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-  openSettings();
-  switchSettingsTab("app");
-  if (result === "connected") {
-    updateFitbitControls(true);
-    await syncFitbitSteps(30);
-  } else if (result === "cancelled") {
-    fitbitStatus.textContent = "Google Health連携をキャンセルしました。";
-  } else {
-    const messages = {
-      invalid_client: "Client IDとClient Secretの組み合わせが一致していません。",
-      invalid_grant: "認証コードを交換できませんでした。もう一度連携してください。",
-      missing_refresh_token: "継続同期用の許可を取得できませんでした。Google側のアクセスを解除してやり直してください。",
-      storage_failed: "Google Healthの接続先テーブルを確認できませんでした。",
-      callback_failed: "Google Healthの接続情報を保存できませんでした。",
-    };
-    fitbitStatus.textContent = messages[errorCode] || "Google Health連携を完了できませんでした。もう一度お試しください。";
-  }
-}
-
-function hasSupabaseConfig() {
-  return Boolean(
-    appConfig.supabaseUrl
-    && appConfig.supabaseAnonKey
-    && !String(appConfig.supabaseUrl).includes("YOUR_"),
-  );
-}
-
-function getAuthRedirectUrl() {
-  const configuredUrl = String(appConfig.authRedirectUrl || "").trim();
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
-  return `${location.origin}${location.pathname}`;
-}
-
-async function initializeAuth() {
-  appShell.setAttribute("inert", "");
-  if (!supabaseClient) {
-    authConfigHelp.hidden = false;
-    authForm.querySelectorAll("input, button").forEach((element) => {
-      element.disabled = true;
-    });
-    setAuthFeedback("error", "管理者によるSupabase接続設定が必要です。");
-    return;
-  }
-
-  const { data } = await supabaseClient.auth.getSession();
-  await applySession(data.session);
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    window.setTimeout(async () => {
-      await applySession(session);
-      if (event === "PASSWORD_RECOVERY") {
-        openSettings();
-        newAccountPassword.focus();
-        setCloudFeedback("loading", "新しいパスワードを設定してください。");
-      }
-    }, 0);
-  });
-}
-
-async function applySession(session) {
-  const nextUser = session?.user || null;
-  if (nextUser?.id === activeUser?.id) return;
-
-  activeUser = nextUser;
-  syncError = "";
-  syncBusy = false;
-  cloudVerified = false;
-  localSaveError = false;
-  dirtyEntryDates.clear();
-  settingsDirty = false;
-  if (!activeUser) {
-    entries = [];
-    deletedEntries = {};
-    profile = {};
-    exercisePresets = getDefaultExercisePresets();
-    foodPresets = getDefaultFoodPresets();
-    appliedPresetSeedVersion = 0;
-    settingsUpdatedAt = new Date(0).toISOString();
-    fitbitConnected = false;
-    authScreen.hidden = false;
-    onboarding.hidden = true;
-    settingsScreen.hidden = true;
-    accountEmail.textContent = "--";
-    appShell.setAttribute("inert", "");
-    setSyncState("ログイン待ち");
-    render();
-    return;
-  }
-
-  authScreen.hidden = true;
-  appShell.removeAttribute("inert");
-  authPassword.value = "";
-  dirtyEntryDates.clear();
-  settingsDirty = false;
+function initializeSingleUser() {
+  migrateSingleUserData();
   importLegacyDeviceData();
   entries = loadEntries();
   deletedEntries = loadDeletedEntries();
@@ -1954,14 +1332,42 @@ async function applySession(session) {
   appliedPresetSeedVersion = loadPresetSeedVersion();
   settingsUpdatedAt = loadSettingsUpdatedAt();
   restoreOutbox();
-  purgeLegacySampleData();
-  accountEmail.textContent = activeUser.email || activeUser.id;
   fillProfileForm();
   fillAllFormsForDate(isoToday);
   showOnboardingIfNeeded();
   render();
-  await syncFromCloud();
-  await handleFitbitReturn();
+}
+
+// Copy a single previous account's cache, including pending writes. Never merge accounts.
+function migrateSingleUserData() {
+  const keys = [storageKey, profileStorageKey, exercisePresetStorageKey,
+    foodPresetStorageKey, presetSeedStorageKey, deletedEntriesStorageKey,
+    settingsUpdatedStorageKey, outboxStorageKey];
+  if (keys.some(key => localStorage.getItem(getUserStorageKey(key)) !== null)) return;
+  const owners = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    for (const base of keys) {
+      if (key.startsWith(base + ":")) {
+        const owner = key.slice(base.length + 1);
+        if (owner !== "signed-out" && owner !== activeUser.id) owners.add(owner);
+      }
+    }
+  }
+  if (owners.size > 1) {
+    window.alert("以前の複数アカウントのデータが見つかりました。混在を避けるため自動移行しません。使用するJSONバックアップを設定から復元してください。");
+    return;
+  }
+  const owner = [...owners][0];
+  // Stage the complete copy before writing so an interrupted migration can retry.
+  const copies = keys.map(base => [getUserStorageKey(base), localStorage.getItem(owner ? `${base}:${owner}` : base)])
+    .filter(([, value]) => value !== null);
+  try {
+    for (const [key, value] of copies) localStorage.setItem(key, value);
+  } catch (error) {
+    for (const [key] of copies) localStorage.removeItem(key);
+    throw error;
+  }
 }
 
 function importLegacyDeviceData() {
@@ -1980,77 +1386,13 @@ function importLegacyDeviceData() {
   });
 }
 
-function clearCurrentUserCache() {
-  if (!activeUser) return;
-  [
-    storageKey,
-    profileStorageKey,
-    exercisePresetStorageKey,
-    foodPresetStorageKey,
-    outboxStorageKey,
-    presetSeedStorageKey,
-    deletedEntriesStorageKey,
-    settingsUpdatedStorageKey,
-  ].forEach((key) => localStorage.removeItem(getUserStorageKey(key)));
-}
-
-function updateAuthMode() {
-  const isSignup = authMode === "signup";
-  authSubmit.textContent = isSignup ? "新規登録" : "ログイン";
-  authModeToggle.textContent = isSignup
-    ? "登録済みの方はこちら（ログイン）"
-    : "初めての方はこちら（新規登録）";
-  authPassword.autocomplete = isSignup ? "new-password" : "current-password";
-  setAuthFeedback("", "");
-}
-
-function setAuthBusy(isBusy) {
-  authSubmit.disabled = isBusy;
-  authModeToggle.disabled = isBusy;
-  forgotPasswordButton.disabled = isBusy;
-  resendConfirmationButton.disabled = isBusy;
-  authEmail.disabled = isBusy;
-  authPassword.disabled = isBusy;
-}
-
-function setAuthFeedback(type, message) {
-  authFeedback.textContent = message;
-  authFeedback.className = type ? `cloud-feedback is-${type}` : "cloud-feedback";
-}
-
-function getAuthErrorMessage(error) {
-  const message = String(error?.message || "").toLowerCase();
-  if (message.includes("invalid login credentials")) return "メールアドレスかパスワードが正しくありません。";
-  if (message.includes("email not confirmed")) return "確認メール内のリンクを開いてからログインしてください。";
-  if (message.includes("already registered") || message.includes("already been registered")) return "このメールアドレスは登録済みです。";
-  if (message.includes("password")) return "パスワードは8文字以上で設定してください。";
-  return "認証に失敗しました。入力内容を確認してください。";
-}
-
-function getResendErrorMessage(error) {
-  const message = String(error?.message || "").toLowerCase();
-  if (message.includes("rate limit") || message.includes("too many")) {
-    return "短時間に何度も送信されています。しばらく待ってから再送してください。";
-  }
-  if (message.includes("already confirmed")) {
-    return "このメールアドレスは確認済みです。通常のログインを試してください。";
-  }
-  return "確認メールを再送できませんでした。少し待ってから試してください。";
-}
-
 function setSyncState(status, message) {
-  const pending = dirtyEntryDates.size + (settingsDirty ? 1 : 0);
-  status = !activeUser ? "ログイン待ち"
-    : localSaveError ? "端末への保存に失敗"
-    : syncBusy ? "クラウドへ同期中"
-    : syncError ? "同期失敗・再試行できます"
-    : pending ? (navigator.onLine ? "端末保存済み・送信待ち" : "端末保存済み・オフライン")
-    : cloudVerified ? "クラウド同期済み" : "クラウド未確認";
+  status = localSaveError ? "端末への保存に失敗" : "端末保存済み";
   if (syncStatus) syncStatus.textContent = status;
   if (assistantSyncStatus) assistantSyncStatus.textContent = status;
   const detail = document.querySelector("#assistant-sync-detail");
-  if (detail) detail.textContent = syncError || (pending ? "端末の記録を保持しています。通信が戻ると再送します。" : "");
-  const pendingCountLabel = `${dirtyEntryDates.size + (settingsDirty ? 1 : 0)}件`;
+  if (detail) detail.textContent = "このブラウザに保存します。設定からJSONバックアップを書き出せます。";
+  const pendingCountLabel = "0件";
   if (pendingSyncCount) pendingSyncCount.textContent = pendingCountLabel;
   if (assistantPendingSyncCount) assistantPendingSyncCount.textContent = pendingCountLabel;
   if (message && cloudFeedback) setCloudFeedback("error", message);
@@ -2112,7 +1454,7 @@ function render() {
   renderWeightOnlyHistory();
   renderFoodShortcuts();
   renderActionInsights();
-  setSyncState(!activeUser ? "ログイン待ち" : (navigator.onLine ? (dirtyEntryDates.size || settingsDirty ? "同期待ち" : "同期済み") : "オフライン保存中"));
+  setSyncState();
 }
 
 function renderSummary() {
@@ -3795,5 +3137,3 @@ function isPrivateHost(hostname) {
 }
 
 render();
-
- document.querySelector("#assistant-retry-sync").addEventListener("click", () => { withCloudBusy(document.querySelector("#assistant-retry-sync"), "同期中...", syncFromCloud); });
