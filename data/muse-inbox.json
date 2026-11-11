@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "id": "2b9cfe67-07a3-5647-abdb-f77a9cffd128",
+      "date": "2026-11-09",
+      "type": "meal",
+      "meal": "lunch",
+      "item": {
+        "name": "鶏むね野菜煮込み丼",
+        "amount": "ご飯200g",
+        "calories": 650,
+        "protein": 45,
+        "fat": 12,
+        "carbs": 90
+      },
+      "note": "2026-11-09 チャット報告（宿直の昼）"
+    },
+    {
+      "id": "90a879d7-21c4-5666-96d9-c924ac47ef9e",
+      "date": "2026-11-09",
+      "type": "meal",
+      "meal": "dinner",
+      "item": {
+        "name": "鶏むね野菜煮込み丼",
+        "amount": "ご飯150g（宿直の夜）",
+        "calories": 570,
+        "protein": 44,
+        "fat": 12,
+        "carbs": 71
+      },
+      "note": "2026-11-09 チャット報告（宿直の夜）"
+    }
+  ]
+}

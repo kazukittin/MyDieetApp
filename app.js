@@ -75,6 +75,10 @@ const QUICK_TRAINING_ITEMS = {
   A: { name: "自宅トレA（上半身＋体幹）", minutes: 30, burnCalories: 135 },
   B: { name: "自宅トレB（下半身＋体幹）", minutes: 30, burnCalories: 135 },
 };
+const MUSE_INBOX_URL = "data/muse-inbox.json";
+const museInboxAppliedKey = "my-diet-notebook:muse-inbox-applied:v1";
+let museInboxImportRunning = false;
+let museInboxLastRunAt = 0;
 const undoToast = document.querySelector("#undo-toast");
 const undoMessage = document.querySelector("#undo-message");
 const undoDeleteButton = document.querySelector("#undo-delete");
@@ -1241,6 +1245,143 @@ function quickRecordWeight(event) {
   setQuickRecordFeedback("success", `${formatDateLabel(isoToday)}の朝の体重 ${value.toFixed(1)}kg を記録しました。`);
 }
 
+// ---- Muse inbox: records Muse pushes to data/muse-inbox.json on GitHub.
+// The app imports each record once (tracked by id) and merges it into the
+// matching day's entry. Deleting an imported item in the app is respected:
+// applied ids are remembered, so a deleted item is never re-imported.
+function loadMuseInboxAppliedIds() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(getUserStorageKey(museInboxAppliedKey))) || [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveMuseInboxAppliedIds(ids) {
+  try {
+    localStorage.setItem(getUserStorageKey(museInboxAppliedKey), JSON.stringify([...ids]));
+  } catch {
+    // Storage full/blocked: intrinsic item ids still prevent most duplicates.
+  }
+}
+
+function recomputeMealTotals(entry) {
+  const previousCalories = entry.mealCalories || {};
+  entry.mealCalories = Object.fromEntries(Object.keys(createEmptyMealItems()).map((key) => [
+    key,
+    entry.mealItems[key].length
+      ? Math.round(entry.mealItems[key].reduce((sum, item) => sum + (item.calories || 0), 0))
+      : (numberOrNull(previousCalories[key]) ?? null),
+  ]));
+  entry.intakeCalories = getMealCaloriesTotal(entry.mealCalories);
+  entry.meals = getMealsFromCalories(entry.mealCalories);
+  entry.meal = deriveMealScore(entry.meals, []);
+}
+
+function applyMuseInboxMeal(record, itemId) {
+  const meal = record.meal;
+  const data = record.item || {};
+  if (!["breakfast", "lunch", "dinner", "snack"].includes(meal) || !data.name) return false;
+  const entry = getOrCreateEntry(record.date);
+  const items = entry.mealItems[meal] || [];
+  if (items.some((item) => item.id === itemId)) return false;
+  entry.mealItems[meal] = [...items, {
+    id: itemId,
+    name: String(data.name),
+    amount: String(data.amount || ""),
+    calories: Math.max(0, Math.round(numberOrNull(data.calories) ?? 0)),
+    protein: Math.max(0, numberOrNull(data.protein) ?? 0),
+    fat: Math.max(0, numberOrNull(data.fat) ?? 0),
+    carbs: Math.max(0, numberOrNull(data.carbs) ?? 0),
+  }];
+  recomputeMealTotals(entry);
+  entry.updatedAt = new Date().toISOString();
+  commitEntry(entry);
+  return true;
+}
+
+function applyMuseInboxExercise(record, itemId) {
+  const data = record.exercise || {};
+  const minutes = numberOrNull(data.minutes);
+  const burn = numberOrNull(data.burnCalories);
+  if (!data.name || minutes === null || minutes <= 0 || burn === null || burn < 0) return false;
+  const entry = getOrCreateEntry(record.date);
+  if ((entry.exerciseItems || []).some((item) => item.id === itemId)) return false;
+  entry.exerciseItems = normalizeExerciseItems([
+    ...(entry.exerciseItems || []),
+    {
+      id: itemId,
+      name: String(data.name),
+      baseUnit: "minute",
+      baseAmount: minutes,
+      multiplier: 1,
+      amount: minutes,
+      caloriesPerBase: burn,
+      burnCalories: burn,
+    },
+  ]);
+  entry.burnCalories = sumExerciseItems(entry.exerciseItems, "burnCalories");
+  entry.exerciseMinutes = sumExerciseItems(entry.exerciseItems, "minutes");
+  entry.exerciseName = entry.exerciseItems[0]?.name || "";
+  entry.exerciseType = "";
+  entry.updatedAt = new Date().toISOString();
+  commitEntry(entry);
+  return true;
+}
+
+function applyMuseInboxWeight(record) {
+  const value = numberOrNull(record.weightMorning);
+  if (value === null || value < 20 || value > 250) return false;
+  const entry = getOrCreateEntry(record.date);
+  if (numberOrNull(entry.weightMorning) !== null) return false; // A value already on the device wins.
+  entry.weightMorning = value;
+  entry.weight = getPrimaryWeight(entry);
+  entry.updatedAt = new Date().toISOString();
+  commitEntry(entry);
+  return true;
+}
+
+async function importMuseInbox() {
+  if (museInboxImportRunning || !activeUser) return;
+  museInboxImportRunning = true;
+  museInboxLastRunAt = Date.now();
+  try {
+    const response = await fetch(`${MUSE_INBOX_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    const records = Array.isArray(payload?.records) ? payload.records : [];
+    if (!records.length) return;
+    const appliedIds = loadMuseInboxAppliedIds();
+    let appliedCount = 0;
+    const appliedLabels = [];
+    for (const record of records) {
+      if (!record || typeof record.id !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(record.date || "")) continue;
+      if (appliedIds.has(record.id)) continue;
+      const itemId = `muse-${record.id}`;
+      let applied = false;
+      if (record.type === "meal") applied = applyMuseInboxMeal(record, itemId);
+      else if (record.type === "exercise") applied = applyMuseInboxExercise(record, itemId);
+      else if (record.type === "weight") applied = applyMuseInboxWeight(record);
+      appliedIds.add(record.id);
+      if (applied) {
+        appliedCount += 1;
+        appliedLabels.push(`${formatShortDate(record.date)}の${record.type === "meal" ? (record.item?.name || "食事") : record.type === "exercise" ? (record.exercise?.name || "運動") : "体重"}`);
+      }
+    }
+    saveMuseInboxAppliedIds(appliedIds);
+    if (appliedCount > 0) {
+      saveEntries();
+      render();
+      setQuickRecordFeedback("success", `むぎからの記録を${appliedCount}件取り込みました：${appliedLabels.join("、")}`);
+    }
+  } catch {
+    // Offline or inbox missing: importing is best-effort and never blocks the app.
+  } finally {
+    museInboxImportRunning = false;
+  }
+}
+
 function renderAssistantRecordSummary(entry, date) {
   if (!entry) {
     assistantRecordSummary.textContent = `${formatDateLabel(date)}：保存済みの記録はありません。`;
@@ -1444,6 +1585,10 @@ function fillWeightFieldsForDate(date) {
 
 function syncFromCloud() { setSyncState(); return Promise.resolve(); }
 
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && Date.now() - museInboxLastRunAt > 5 * 60 * 1000) importMuseInbox();
+});
+
 function pushEntriesToCloud() { setSyncState(); return Promise.resolve(); }
 
 function getCloudErrorMessage(error) {
@@ -1465,6 +1610,7 @@ function initializeSingleUser() {
   fillAllFormsForDate(isoToday);
   showOnboardingIfNeeded();
   render();
+  importMuseInbox();
 }
 
 // Copy a single previous account's cache, including pending writes. Never merge accounts.
